@@ -1,0 +1,18 @@
+<package>
+  <description brief="General linux usb camera driver using v4l2 and GStreamer.">
+  Can also be used with the e-CAM32_OMAP_GSTIX expansion board.
+  </description>
+  <author>Stefan Haase/stefan.haase@dfki.de</author>
+  <license></license>
+  <url>http://</url>
+  <logo>http://</logo>
+  <!--
+   To add any dependencies use the depend tag
+  <depend package="dummy-dependency-0" />
+	...
+  <depend package="dummy-dependency-n-1" />
+  <depend package="dummy-dependency-n" />
+  -->
+  <depend package="drivers/camera_interface" />
+  <depend package="external/gst_dsp_arm" />
+</package>
