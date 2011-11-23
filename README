@@ -1,3 +1,15 @@
+This usb camera driver uses 4vl2 to configure the connected usb camera and GStreamer 
+to request images and to convert them to jpegs. 
+
+Depends on the gst_dsp_arm packet. This is more or less just a link to the
+precompiled GStreamer-packet located in /opt/arm/gst.
+In the gst_dsp_arm packet you can find a ruby script which can be used to
+(cross-)compile and install GStreamer and its dependencies (for your system as well as for 
+ARM-architecture).
+Thus, you can use this driver on the Gumstix to request images from the
+e-CAM32_OMAP_GSTIX, as well. In addition, the dsp - if available - will be
+used for jpeg-compression.
+
 NOTE
 This directory structure follows some simple rules, to allow for generic build
 processes and simplify reuse of this project. 
