@@ -83,7 +83,7 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
     if(!success)
         return false;
     // data_depth is unknown but must not be zero.
-    frame.init(mCamGst->getWidth(), mCamGst->getHeight(), 1, base::samples::frame::MODE_PJPG, 0, buf_size);
+    frame.init(mCamGst->getWidth(), mCamGst->getHeight(), 3, base::samples::frame::MODE_PJPG, 0, buf_size);
     frame.setImage((char*)buffer, buf_size);
     delete buffer; buffer = NULL;
     return true;
@@ -267,10 +267,10 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
 bool CamUsb::getFrameSettings(base::samples::frame::frame_size_t &size,
                                 base::samples::frame::frame_mode_t &mode,
                                 uint8_t &color_depth) {
-    size.width = image_size_.width;
-    size.height = image_size_.height;
-    mode = base::samples::frame::MODE_PJPG;
-    color_depth = 1;
+
+    size = image_size_;
+    mode = image_mode_;
+    color_depth = image_color_depth_;
     
     return true;
 }
