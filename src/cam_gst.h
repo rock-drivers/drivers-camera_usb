@@ -37,6 +37,9 @@ class CamGst {
  public:
     /**
      * Initialize GStreamer and starts the GMainLoop in its own thread.
+     * \param device Only used to configure the GStreamer source (e.g. /dev/video0).
+     * \param cam_config Pointer to a CamConfig object, used to get a valid image size 
+     * and fps and for general configurations.
      */
     CamGst(std::string const& device);
 
@@ -60,14 +63,16 @@ class CamGst {
             uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY);
 
     /**
+     * Deletes pipeline, clears buffer.
+     */
+    void deletePipeline();
+
+    /**
      * Starts current pipeline in another thread.
      */
     bool startPipeline();
 
-    /**
-     * Deletes pipeline, clears buffer.
-     */
-    void deletePipeline();
+    void stopPipeline();
 
     /**
      * Allows to request a copy of the new image.
@@ -98,18 +103,6 @@ class CamGst {
         return mNewBuffer;
     }
 
-    inline uint32_t getWidth() {
-        return mWidth;
-    }
-
-    inline uint32_t getHeight() {
-        return mHeight;
-    }
-
-    inline uint32_t getFps() {
-        return mFps;
-    }
-
  private:
     CamGst();
 
@@ -118,8 +111,7 @@ class CamGst {
      * (driver will choose most suitable).
      * Sets the member variables as well.
      */
-    void setCameraParameters(std::string const& device, 
-            uint32_t* width, uint32_t* height, uint32_t* fps);
+    void setCameraParameters(uint32_t width, uint32_t height, uint32_t fps);
 
     GstElement* createDefaultSource(std::string const& device);
 
@@ -141,7 +133,7 @@ class CamGst {
 
  private:
     std::string mDevice;
-    uint32_t mWidth, mHeight, mFps;
+    CamConfig* mpCamConfig;
     uint32_t mJpegQuality;
     GMainLoop* mLoop;
     pthread_t* mMainLoopThread;

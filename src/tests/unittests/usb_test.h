@@ -27,13 +27,13 @@ BOOST_AUTO_TEST_CASE(init_test) {
     
     BOOST_CHECK(usb.isOpen() == false);
     BOOST_CHECK(usb.getCameraInfo() == NULL);
-    BOOST_CHECK(usb.close() == false);
+    usb.close();
 
     BOOST_CHECK(usb.open(cam_infos[0]) == true);
     BOOST_CHECK(usb.isOpen() == true);
     BOOST_CHECK(usb.getCameraInfo() != NULL);
 
-    BOOST_CHECK(usb.close() == true);
+    usb.close();
 }
 
 BOOST_AUTO_TEST_CASE(buffer_test) {
@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(buffer_test) {
     BOOST_CHECK(frame.getWidth() == 640);
     BOOST_CHECK(frame.getHeight() == 480);
     BOOST_CHECK(frame.getFrameMode() == base::samples::frame::MODE_PJPG);
-    BOOST_CHECK(usb.close() == true);
+    usb.close();
     
     base::samples::frame::frame_size_t size(1280, 720);
     BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_PJPG, 1));

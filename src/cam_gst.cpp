@@ -9,7 +9,7 @@ namespace camera
 {
 
 // PUBLIC
-CamGst::CamGst(std::string const& device) : mDevice(device),  
+CamGst::CamGst(std::string const& device, CamConfig* cam_config) : mDevice(device), mpCamConfig(cam_config),  
         mJpegQuality(DEFAULT_JPEG_QUALITY), 
         mLoop(NULL),
         mMainLoopThread(NULL),
@@ -44,13 +44,17 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
         uint32_t jpeg_quality) {
     
     // Take the last used values if parameter is 0.
-    if(width == 0) width = mWidth;
-    if(height == 0) height = mHeight;
-    if(fps == 0) fps = mFps;
+    if(width == 0) mpCamConfig->getImageWidth(&width);
+    if(height == 0) mpCamConfig->getImageHeight(&height);
+    if(fps == 0) mpCamConfig->getFPS(&fps);
     if(jpeg_quality == 0) jpeg_quality = mJpegQuality;
 
     // Sets the passed parameters if possible, otherwise valid ones.
-    setCameraParameters(mDevice, &width, &height, &fps);
+    setCameraParameters(width, height, fps);
+    // The valid ones has to be requested by using mpCamConfig.
+    mpCamConfig->getImageWidth(&width);
+    mpCamConfig->getImageHeight(&height);
+    mpCamConfig->getFPS(&fps);
 
     deletePipeline();
 
@@ -78,9 +82,24 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
     gst_object_unref (bus);    
 }
 
+void CamGst::deletePipeline() {
+    if(mPipeline == NULL)
+        return;
+    
+    stopPipeline();
+
+    gst_object_unref(GST_OBJECT(mPipeline));
+    mPipeline = NULL;
+    mPipelineRunning = false;
+    mNewBuffer = false;
+}
+
 bool CamGst::startPipeline() {
-    if(mPipeline == NULL || mPipelineRunning) 
+    if(mPipeline == NULL) 
         return false;
+
+    if(mPipelineRunning)
+        return true;
 
     GstState state;
     GstStateChangeReturn ret_state;
@@ -100,16 +119,12 @@ bool CamGst::startPipeline() {
     return mPipelineRunning;
 }
 
-void CamGst::deletePipeline() {
-    if(mPipeline == NULL)
-        return;
+void stopPipeline() {
+    if(!mPipelineRunning)
+        return true;
 
-    // Setting to GST_STATE_NULL does not happen asynchronously.
+    // Setting to GST_STATE_NULL does not happen asynchronously, wait until stop.
     gst_element_set_state(mPipeline, GST_STATE_NULL);
-    gst_object_unref(GST_OBJECT(mPipeline));
-    mPipeline = NULL;
-    mPipelineRunning = false;
-    mNewBuffer = false;
 }
 
 bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read, 
@@ -179,26 +194,20 @@ void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size,
 
 CamGst::CamGst() {}
 
-void CamGst::setCameraParameters(std::string const& device, 
-        uint32_t* width, uint32_t* height, uint32_t* fps) {
-    try {
-        CamConfig config(device);
-        config.writeImagePixelFormat(*width, *height);
-        config.getImageWidth(width);
-        config.getImageHeight(height);
+void CamGst::setCameraParameters(uint32_t width, uint32_t height, uint32_t fps) {
 
-        config.setFPS(*fps);
-        config.getFPS(fps);
+    try {
+        mpCamConfig->writeImagePixelFormat(width, height);
+        mpCamConfig->writeFPS(fps);
     } catch (std::runtime_error& err) {
         throw CamGstException(err.what());
     }
 
-    mWidth = *width;
-    mHeight = *height;
-    mFps = *fps;
-
-    std::cout << "Set camera parameters: width " << mWidth << 
-            ", height " << mHeight << ", fps " << mFps << std::endl;
+    mpCamConfig->getImageWidth(&width);
+    mpCamConfig->getImageHeight(&height);
+    mpCamConfig->getFPS(&fps);
+    std::cout << "Set camera parameters: width " << width << 
+            ", height " << height << ", fps " << fps << std::endl;
 }
 
 GstElement* CamGst::createDefaultSource(std::string const& device) {

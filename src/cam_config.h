@@ -26,6 +26,13 @@ class CamConfigException : public std::runtime_error {
 
 /**
  * Using v4l2 to read and set the parameters of the specified camera.
+ * An object of this class maxy not be used parallel to CamGst, because they would block the device.
+ * Thus, use this to configure your camera and set parameters and delete it afterwards.
+ * Initially, all values are empty. According to your needs initially call \n
+ *  - readCapability()
+ *  - readControl()
+ *  - readImageFormat()
+ *  - readStreamparm() 
  * Important: For newly-connected cameras the device driver can return a wrong image size!
  * Prevent that by calling writeImagePixelFormat() without any parameters during initialization.
  */
@@ -110,7 +117,18 @@ class CamConfig
 
     void listControls();
 
+    /**
+     * Returns the last stored value of the control.
+     * If you want to take care that the value is the same value stored on the camera,
+     * use 'readControlValue()' (but be careful the device is not in used).
+     */
     bool isControlIdValid(uint32_t const id);
+
+    /**
+     * Gets the last set control value, use 'readControl()' if you 
+     * want to get the current value set on the camera.
+     */
+    bool getControlValue(uint32_t const id, int32_t* value);
 
     bool getControlType(uint32_t const id, enum v4l2_ctrl_type* type);
 
@@ -192,17 +210,24 @@ class CamConfig
     void listStreamparm();
 
     /**
+     * 
+     */
+    bool readFPS(uint32_t* fps);
+
+    /**
+     * Tries to set the passed fps, just use writeStreamparm(1,fps).
+     * Throws std::runtime_error if an io-error occurred.
+     */
+    void writeFPS(uint32_t const fps);
+
+    /**
      * Returns denominator / numerator.
+     * If you want to read the current value from the camera use
+     * 'readFPS()', but be careful that the device is not busy.
      * \param fps Sets fps to 0 if not set.
      * \return Always true.
      */
     bool getFPS(uint32_t* fps);
-
-    /**
-     * Just use writeStreamparm(1,fps).
-     * Throws std::runtime_error if an io-error occurred.
-     */
-    void setFPS(uint32_t const fps);
 
     /** 
      * Only supported flag: V4L2_CAP_TIMEPERFRAME (is it allowd

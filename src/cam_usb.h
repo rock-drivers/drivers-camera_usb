@@ -25,6 +25,14 @@
 namespace camera 
 {
 
+/**
+ * Uses CamConfig to set and get all releveant camera parameters.
+ * The GStreamer component starts a thread internally requesting images from the
+ * same device camera-config is working with. This could lead to 
+ * an exception telling the device is already in use.
+ * Therefore, this class takes care that configuration is only possible if the
+ * device is closed / the pipeline is deleted.
+ */
 class CamUsb : public CamInterface {
 
  public: // STATICS
@@ -67,6 +75,7 @@ class CamUsb : public CamInterface {
 
     /**
      * Reads a JPEG and initializes the passed frame (blocking read).
+     * TODO Put timestamp information in frame.
      * \return true if a new image could be requested in 'timeout' msecs.
      */
     virtual bool retrieveFrame(base::samples::frame::Frame &frame,const int timeout=1000);
@@ -160,6 +169,11 @@ class CamUsb : public CamInterface {
                                 const bool resize_frames = true);
     */
 
+    /**
+     * Requests the image size and sets mode always to MODE_PJPG and color depth always to 3,
+     * because the resulting image depends on the defined pipeline, which creates
+     * a jpeg at the moment.
+     */
     virtual bool getFrameSettings(base::samples::frame::frame_size_t &size,
                                     base::samples::frame::frame_mode_t &mode,
                                     uint8_t &color_depth);

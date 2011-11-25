@@ -20,6 +20,8 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
         std::string err_str(strerror(errno));
         throw std::runtime_error(err_str.insert(0, "Could not open device: "));
     }
+
+    /*
     // Catches CamConfigException (not supported functionalities).
     // std::runtime error is passed.
     try {
@@ -42,6 +44,7 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     } catch (CamConfigException& err) {
         std::cout << err.what() << std::endl;
     }
+    */
 }
 
 CamConfig::~CamConfig() {
@@ -287,6 +290,18 @@ void CamConfig::listControls() {
 
 bool CamConfig::isControlIdValid(uint32_t const id) {
     return (mCamCtrls.find(id) != mCamCtrls.end());
+}
+
+bool CamConfig::getControlValue(uint32_t const id, int32_t* value) {
+    std::map<uint32_t, struct CamCtrl>::iterator it;
+    it = mCamCtrls.find(id);
+
+    if(it == mCamCtrls.end())
+        return false;
+
+    *value = it->second.mValue;
+
+    return true;   
 }
 
 bool CamConfig::getControlType(uint32_t const id, enum v4l2_ctrl_type* type) { 
@@ -596,7 +611,9 @@ void CamConfig::listStreamparm() {
     std::cout << "Readbuffers: " << mStreamparm.parm.capture.readbuffers << read_str << std::endl;
 }
 
-bool CamConfig::getFPS(uint32_t* fps) {
+bool CamConfig::readFPS(uint32_t* fps) {
+    readStreamparm();
+
     uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
     uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
     
@@ -604,12 +621,20 @@ bool CamConfig::getFPS(uint32_t* fps) {
     return true;
 }
 
-void CamConfig::setFPS(uint32_t fps) {
+void CamConfig::writeFPS(uint32_t fps) {
     try {
         writeStreamparm(1,fps);
     } catch (CamConfigException& err) {
         std::cerr << err.what() << std::endl;
     }
+}
+
+bool CamConfig::getFPS(uint32_t* fps) {
+    uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
+    uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
+    
+    *fps = n == 0 ? 0 : d/n;
+    return true;
 }
 
 bool CamConfig::hasCapabilityStreamparm(uint32_t capability_field) {

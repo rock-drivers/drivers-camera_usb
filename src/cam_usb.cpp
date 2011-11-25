@@ -6,7 +6,7 @@ namespace camera
 CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamConfig(NULL), mCamGst(NULL), 
         mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0){
     mCamConfig = new CamConfig(device);
-    mCamGst = new CamGst(device);
+    mCamGst = new CamGst(device, mCamConfig);
     mDevice = device;
     createAttrsCtrlMaps();
 }
@@ -42,11 +42,10 @@ bool CamUsb::open(const CamInfo &cam,const AccessMode mode) {
 
     mCamInfo = cam; // Assign camera (not allowed in listCameras()).
 
-    if(mFps > 0)
-        mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, mFps);
-    else
-        mCamGst->createDefaultPipeline(image_size_.width, image_size_.height);
-    bool started = mCamGst->startPipeline(); // Frames will be requested as fast as possible.
+    // If one of the parameters is 0, the current setting of the camera is used.
+    mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, mFps);
+
+    bool started = mCamGst->startPipeline(); // Frames will be requested continuously.
     mIsOpen = started;
     return mIsOpen;
 }
@@ -56,17 +55,17 @@ bool CamUsb::isOpen()const {
 }
 
 const CamInfo* CamUsb::getCameraInfo()const {
-    if(mIsOpen)
+    if(mIsOpen) 
         return &mCamInfo;
     else
         return NULL;
 }
 
 bool CamUsb::close() {
-    if(!mIsOpen)
-        return false;
-    mCamGst->deletePipeline();
-    mIsOpen = false;
+    if(mIsOpen) {
+        mCamGst->deletePipeline();
+        mIsOpen = false;
+    }
     return true;
 }
 
@@ -83,7 +82,11 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
     if(!success)
         return false;
     // data_depth is unknown but must not be zero.
-    frame.init(mCamGst->getWidth(), mCamGst->getHeight(), 3, base::samples::frame::MODE_PJPG, 0, buf_size);
+    base::samples::frame::frame_size_t size;
+    base::samples::frame::frame_mode_t mode;
+    uint8_t color_depth;
+    getFrameSettings(size, mode, color_depth);
+    frame.init(size.width, size.height, color_depth, mode, 0, buf_size);
     frame.setImage((char*)buffer, buf_size);
     delete buffer; buffer = NULL;
     return true;
@@ -113,6 +116,11 @@ bool CamUsb::setAttrib(const int_attrib::CamAttrib attrib, const int value) {
 }
 
 bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value) {
+    if(mIsOpen) {
+        std::cerr << "Close the device before reading and writing attributes." << std::endl;        
+        return false;
+    }
+
     switch(attrib) {
 
         case double_attrib::FrameRate:
@@ -120,8 +128,7 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
             // Following line throws ERROR Could not write stream parameter: Device or resource busy.
             // Just set the member variable mFps. If the camera is closed and reopen, the
             // new fps will take into account.
-            //mCamConfig->setFPS((uint32_t)value);
-            mFps = (uint32_t)value;
+            mCamConfig->writeFPS((uint32_t)value);
             break;
         }
         default:
@@ -136,6 +143,10 @@ bool setAttrib(const str_attrib::CamAttrib attrib,const std::string value) {
 }
 
 bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
+    if(mIsOpen) {
+        std::cerr << "Close the device before reading and writing attributes." << std::endl;        
+        return false;
+    }
 
     switch(attrib) {
         case enum_attrib::WhitebalModeToManual: {
@@ -222,7 +233,15 @@ int CamUsb::getAttrib(const int_attrib::CamAttrib attrib) {
     if(it == mMapAttrsCtrlsInt.end())
         throw std::runtime_error("Unknown attribute!");
     
-    return mCamConfig->readControlValue(it->second);
+    if(mIsOpen) {
+        std::cout << "Returns the last set attribute. Close the device if "<<
+            "you want to request the attribute from the camera directly. " << std::endl;        
+        int32_t value = 0;
+        mCamConfig->getControlValue(it->second, &value);
+        return value;
+    } else {
+        return mCamConfig->readControlValue(it->second);   
+    }
 }
 
 double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
@@ -230,7 +249,15 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
     switch(attrib) {
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            mCamConfig->getFPS(&mFps);
+            uint32_t fps;
+            if(mIsOpen) {
+                mCamConfig->getFPS(&fps);   
+                std::cout << "Returns the last set fps. Close the device if "<<
+                    "you want to request the fps from the camera directly. " << std::endl;        
+            }
+            else {
+                mCamConfig->readFPS(&fps);
+            }
             return (double)mFps;
         }
         default:
@@ -239,24 +266,60 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
 }
 
 bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
+    int32_t value = 0;
     switch(attrib) {
-        case enum_attrib::WhitebalModeToManual:
-        case enum_attrib::WhitebalModeToAuto: {
-            return (bool)mCamConfig->readControlValue(V4L2_CID_AUTO_WHITE_BALANCE);
+        case enum_attrib::WhitebalModeToManual: {
+            if(mIsOpen)
+                mCamConfig->getControlValue(V4L2_CID_AUTO_WHITE_BALANCE,&value);
+            else
+                value = mCamConfig->readControlValue(V4L2_CID_AUTO_WHITE_BALANCE); 
+            return value == 0;
         }
-        case enum_attrib::GainModeToManual:
+        case enum_attrib::WhitebalModeToAuto: {
+            if(mIsOpen)
+                mCamConfig->getControlValue(V4L2_CID_AUTO_WHITE_BALANCE,&value);
+            else
+                value = mCamConfig->readControlValue(V4L2_CID_AUTO_WHITE_BALANCE); 
+            return value == 1;
+        }
+        case enum_attrib::GainModeToManual: {
+            if(mIsOpen)
+                mCamConfig->getControlValue(V4L2_CID_AUTOGAIN,&value);
+            else
+                value = mCamConfig->readControlValue(V4L2_CID_AUTOGAIN); 
+            return value == 0;
+        }
         case enum_attrib::GainModeToAuto: {
-            return (bool)mCamConfig->readControlValue(V4L2_CID_AUTOGAIN);
+            if(mIsOpen)
+                mCamConfig->getControlValue(V4L2_CID_AUTOGAIN,&value);
+            else
+                value = mCamConfig->readControlValue(V4L2_CID_AUTOGAIN); 
+            return value == 1;
         }
         case enum_attrib::PowerLineFrequencyDisabled: {
-            return 0 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY);
+            if(mIsOpen) {
+                mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value);
+                return value == 0;
+            }
+            else
+                return 0 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY); 
         }
         case enum_attrib::PowerLineFrequencyTo50: {
-            return 1 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY);
+           if(mIsOpen) {
+                mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value);
+                return value == 1;
+            }
+            else
+                return 1 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY); 
             break;
         }
         case enum_attrib::PowerLineFrequencyTo60: {
-            return 2 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY);
+            if(mIsOpen) {
+                mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value);
+                return value == 2;
+            }
+            else
+                return 2 == mCamConfig->readControlValue(V4L2_CID_POWER_LINE_FREQUENCY); 
         }
         // attribute unknown or not supported (yet)
         default:
@@ -267,10 +330,20 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
 bool CamUsb::getFrameSettings(base::samples::frame::frame_size_t &size,
                                 base::samples::frame::frame_mode_t &mode,
                                 uint8_t &color_depth) {
-
-    size = image_size_;
-    mode = image_mode_;
-    color_depth = image_color_depth_;
+    // Read current values from the camera if device is not open.
+    if(!mIsOpen) {      
+        mCamConfig->readImageFormat();
+    } else {
+        std::cout << "Returns the last set image size. Close the device if "<<
+                "you want to request the image size from the camera directly. " << std::endl;  
+    }
+    uint32_t width = 0, height = 0;
+    mCamConfig->getImageWidth(&width);
+    mCamConfig->getImageHeight(&height);
+    size.width = (uint16_t)width;
+    size.height = (uint16_t)height;
+    mode = base::samples::frame::MODE_PJPG;
+    color_depth = 3;
     
     return true;
 }
