@@ -11,9 +11,12 @@ namespace camera
  
 CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtrls(), 
             mFormat(), mStreamparm() {
-        memset(&mCapability, 0, sizeof(struct v4l2_capability));
-        memset(&mFormat, 0, sizeof(struct v4l2_format));
-        memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: constructor" << std::endl;
+    #endif
+    memset(&mCapability, 0, sizeof(struct v4l2_capability));
+    memset(&mFormat, 0, sizeof(struct v4l2_format));
+    memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
     mFd = open(device.c_str(), O_NONBLOCK | O_RDWR);
     if (mFd <= 0) {
@@ -21,7 +24,6 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
         throw std::runtime_error(err_str.insert(0, "Could not open device: "));
     }
 
-    /*
     // Catches CamConfigException (not supported functionalities).
     // std::runtime error is passed.
     try {
@@ -44,10 +46,12 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     } catch (CamConfigException& err) {
         std::cout << err.what() << std::endl;
     }
-    */
 }
 
 CamConfig::~CamConfig() {
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: destructor" << std::endl;
+    #endif
     close(mFd);
 }
 

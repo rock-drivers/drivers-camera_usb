@@ -9,12 +9,14 @@ namespace camera
 {
 
 // PUBLIC
-CamGst::CamGst(std::string const& device, CamConfig* cam_config) : mDevice(device), mpCamConfig(cam_config),  
+CamGst::CamGst(std::string const& device) : mDevice(device), 
         mJpegQuality(DEFAULT_JPEG_QUALITY), 
         mLoop(NULL),
         mMainLoopThread(NULL),
         mPipeline(NULL),
-        mPipelineRunning(false) {
+        mPipelineRunning(false),
+        mSource(NULL),
+        mFileDescriptor(-1) {
     // gst_is_initialiszed() not available (since 0.10.31), 
     // could lead to a gst-mini-unref-warning.
     gst_init(NULL, NULL);
@@ -43,22 +45,13 @@ CamGst::~CamGst() {
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
         uint32_t jpeg_quality) {
     
-    // Take the last used values if parameter is 0.
-    if(width == 0) mpCamConfig->getImageWidth(&width);
-    if(height == 0) mpCamConfig->getImageHeight(&height);
-    if(fps == 0) mpCamConfig->getFPS(&fps);
-    if(jpeg_quality == 0) jpeg_quality = mJpegQuality;
-
-    // Sets the passed parameters if possible, otherwise valid ones.
-    setCameraParameters(width, height, fps);
-    // The valid ones has to be requested by using mpCamConfig.
-    mpCamConfig->getImageWidth(&width);
-    mpCamConfig->getImageHeight(&height);
-    mpCamConfig->getFPS(&fps);
-
     deletePipeline();
 
+    // Sets the passed parameters if possible, otherwise valid ones.
+    setCameraParameters(&width, &height, &fps, &jpeg_quality);
+
     GstElement* source = createDefaultSource(mDevice);
+    mSource = source;
     GstElement* cap = createDefaultCap(width, height, fps); // format
     GstElement* encoder = createDefaultEncoder(jpeg_quality);
     GstElement* sink = createDefaultSink();
@@ -116,15 +109,21 @@ bool CamGst::startPipeline() {
     }
 
     mPipelineRunning = (ret_state == GST_STATE_CHANGE_SUCCESS ? true : false);
+
+    // Tries to set the file descriptor as well.
+    readFileDescriptor();
+
     return mPipelineRunning;
 }
 
-void stopPipeline() {
+void CamGst::stopPipeline() {
     if(!mPipelineRunning)
-        return true;
+        return;
 
     // Setting to GST_STATE_NULL does not happen asynchronously, wait until stop.
     gst_element_set_state(mPipeline, GST_STATE_NULL);
+
+    rmFileDescriptor();
 }
 
 bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read, 
@@ -194,20 +193,25 @@ void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size,
 
 CamGst::CamGst() {}
 
-void CamGst::setCameraParameters(uint32_t width, uint32_t height, uint32_t fps) {
+void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps, uint32_t* jpeg_quality) {
 
-    try {
-        mpCamConfig->writeImagePixelFormat(width, height);
-        mpCamConfig->writeFPS(fps);
-    } catch (std::runtime_error& err) {
-        throw CamGstException(err.what());
-    }
+    CamConfig config(mDevice);
 
-    mpCamConfig->getImageWidth(&width);
-    mpCamConfig->getImageHeight(&height);
-    mpCamConfig->getFPS(&fps);
-    std::cout << "Set camera parameters: width " << width << 
-            ", height " << height << ", fps " << fps << std::endl;
+    // Take the last used values if parameter is 0.
+    if(*width == 0) config.getImageWidth(width);
+    if(*height == 0) config.getImageHeight(height);
+    if(*fps == 0) config.getFPS(fps);
+    if(*jpeg_quality == 0) *jpeg_quality = mJpegQuality;
+
+    config.writeImagePixelFormat(*width, *height);
+    config.writeFPS(*fps);
+
+    // Get the actual parameters set by the driver.
+    config.getImageWidth(width);
+    config.getImageHeight(height);
+    config.getFPS(fps);
+    std::cout << "Set camera parameters: width " << *width << 
+            ", height " << *height << ", fps " << *fps << std::endl;
 }
 
 GstElement* CamGst::createDefaultSource(std::string const& device) {
@@ -267,6 +271,24 @@ GstElement* CamGst::createDefaultSink() {
     // do after add und link? Disconnecting?
 	g_signal_connect (element, "new-buffer",  G_CALLBACK (callbackNewBuffer), this);
     return element;
+}
+
+bool CamGst::readFileDescriptor(){
+    if(!mPipelineRunning || mSource == NULL) {
+        std::cerr << "Pipeline is not running or no source available, "<<
+                "FD could not be requested." << std::endl;
+        return false;
+    }
+
+    // Request and store file descriptor.
+    int file_descriptor = -1;
+    g_object_get(G_OBJECT (mSource), "device-fd", &file_descriptor, (void*)NULL);
+    if(file_descriptor == -1) {
+        std::cerr << "FD could not be requested." << std::endl;
+        return false;
+    }
+    mFileDescriptor = file_descriptor;
+    return true;   
 }
 
 // PRIVATE STATIC

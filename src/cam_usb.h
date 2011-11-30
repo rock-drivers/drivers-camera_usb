@@ -31,7 +31,15 @@ namespace camera
  * same device camera-config is working with. This could lead to 
  * an exception telling the device is already in use.
  * Therefore, this class takes care that configuration is only possible if the
- * device is closed / the pipeline is deleted.
+ * device is closed / the pipeline is deleted.\n
+ * To get an image you have to do:\n
+ * 1. CamUsb constructor passing the device.
+ * 2. setFrameSettings to define the size, mode and data_depth of the image.
+ *    optional: set attributes like brightness etc.
+ * 3. listCameras to get a list of available cameras.
+ * 4. open one of the available cameras (here always the first and only one).
+ * 5. call grab to start requesting images / the GStreamer pipeline. 
+ * 6. retrieveFrame to get a Frame.
  */
 class CamUsb : public CamInterface {
 
@@ -49,7 +57,7 @@ class CamUsb : public CamInterface {
     virtual int listCameras(std::vector<CamInfo> &cam_infos)const;
 
     /**
-     * Kind of initialization, creates and starts pipeline and stores the passed
+     * Kind of initialization, creates pipeline and stores the passed
      * CamInfo structure.
      * \return Sets mIsOpen to true and returns true if the pipeline could be started.
      */
@@ -69,7 +77,11 @@ class CamUsb : public CamInterface {
     virtual bool close();
 
     /**
-     * Images are grapped continuously, method just returns true if a new image is available.
+     * To start the pipeline, just set 'mode' to sth. other than Stop (SingleFrame,
+     * MultiFrame or Continuously). Images are always grapped continuously.
+     * Could throw std::runtime_error if the passed mode is unknown or the mode should 
+     * changed during the pipeline is running.
+     * \return Return false if the pipeline could not be started.
      */
     virtual bool grab(const GrabMode mode = SingleFrame, const int buffer_len=1);              
 
@@ -156,23 +168,21 @@ class CamUsb : public CamInterface {
     virtual bool isAttribSet(const enum_attrib::CamAttrib attrib);
 
     /**
-     * At the moment only the parameter 'size' is used.
-     * Where to set fps?
+     * If necessary 'size' will be changed to a valid one. 'mode' should be set to
+     * base::samples::frame::MODE_PJPG and 'color_depth' to 3.
      */
+    bool setFrameSettings(const base::samples::frame::frame_size_t size,
+                                const base::samples::frame::frame_mode_t mode,
+                                const uint8_t color_depth,
+                                const bool resize_frames = true);
+    
     /*
-    virtual bool setFrameSettings(const base::samples::frame::frame_size_t size,
-                                  const base::samples::frame::frame_mode_t mode,
-                                  const uint8_t color_depth,
-                                  const bool resize_frames = true);
-
     virtual bool setFrameSettings(const base::samples::frame::Frame &frame,
                                 const bool resize_frames = true);
     */
 
     /**
-     * Requests the image size and sets mode always to MODE_PJPG and color depth always to 3,
-     * because the resulting image depends on the defined pipeline, which creates
-     * a jpeg at the moment.
+     * 
      */
     virtual bool getFrameSettings(base::samples::frame::frame_size_t &size,
                                     base::samples::frame::frame_mode_t &mode,
@@ -193,8 +203,15 @@ class CamUsb : public CamInterface {
     //virtual bool setFrameToCameraFrameSettings(base::samples::frame::Frame &frame);
 
     virtual bool setCallbackFcn(void (*pcallback_function)(const void* p),void *p) {
-        throw std::runtime_error("This camerea does not support callback functions. "
-		        "Use is isFrameAvailable() instead.");
+
+        if(!pcallback_function)
+            throw std::runtime_error ("You can not set the callback function to null!!! "
+            "Otherwise CamUsb::callUserCallbackFcn would not be thread safe.");
+
+        mpCallbackFunction = pcallback_function;
+        mpPassThroughPointer = p;
+
+        return true;
     }
 
     virtual void synchronizeWithSystemTime(uint32_t time_interval)
@@ -219,22 +236,24 @@ class CamUsb : public CamInterface {
 
     virtual int getFileDescriptor() const;
 
-    //virtual std::string doDiagnose();
-
  private:
     CamUsb(){};
 
-    CamConfig* mCamConfig;
     CamGst* mCamGst;
     std::string mDevice;
 
-    bool mIsOpen;
+    // Pipeline has been created and is running. No further configuration possible.
+    bool mIsOpen; 
 
     struct CamInfo mCamInfo; 
 
     std::map<int_attrib::CamAttrib, int> mMapAttrsCtrlsInt;
 
     uint32_t mFps;
+    
+    // FD driven image receiving (?).
+    void (*mpCallbackFunction)(const void* p);
+    void* mpPassThroughPointer;
 
     void createAttrsCtrlMaps();
 };

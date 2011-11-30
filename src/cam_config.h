@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#define PRINT_DEBUG 0
+
 namespace camera 
 {
 
@@ -26,13 +28,8 @@ class CamConfigException : public std::runtime_error {
 
 /**
  * Using v4l2 to read and set the parameters of the specified camera.
- * An object of this class maxy not be used parallel to CamGst, because they would block the device.
+ * An object of this class may not be used parallel to CamGst, because they would block the device.
  * Thus, use this to configure your camera and set parameters and delete it afterwards.
- * Initially, all values are empty. According to your needs initially call \n
- *  - readCapability()
- *  - readControl()
- *  - readImageFormat()
- *  - readStreamparm() 
  * Important: For newly-connected cameras the device driver can return a wrong image size!
  * Prevent that by calling writeImagePixelFormat() without any parameters during initialization.
  */

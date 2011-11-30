@@ -24,7 +24,12 @@ class CamGstException : public std::runtime_error {
  public:
     CamGstException(const std::string& what_arg) : std::runtime_error(what_arg) {}
 };
-// TODO Make singleton?
+
+/**
+ * Still problem with calling gst_init() several times?
+ * E.g. its not possible to create one object of CamGst, remove it,
+ * create another, try to create a default source -> not possible. Why?
+ */
 class CamGst {
 
  public: // CONSTANTS
@@ -68,7 +73,9 @@ class CamGst {
     void deletePipeline();
 
     /**
-     * Starts current pipeline in another thread.
+     * Starts current pipeline in another a GStreamer intern thread.
+     * Pipeline has to be already created.
+     * \return True if its already running or could be started.
      */
     bool startPipeline();
 
@@ -81,8 +88,9 @@ class CamGst {
      * \param buf_size Will get the image size or 0 if no image is available.
      * \param blocking_read If true, method will return as soon as a new image is available. 
      * \param timeout Max. time to wait for the frame in msec. < 1 means no timeout.
-     * \return true if a new image is available, otherwise false. Always returns true if 
-     * blocking_read is set to true. Return false after 
+     * \return blocking-read not active: true if a new image is available, otherwise false. \n
+     * blocking_read active: Returns true as soon as a new image is available or false 
+     * after 'timeout' msec.
      */
     bool getBuffer(uint8_t** buffer, uint32_t* buf_size, 
             bool blocking_read=FALSE, int32_t timeout=0);
@@ -103,15 +111,29 @@ class CamGst {
         return mNewBuffer;
     }
 
+    inline bool isPipelineRunning() {
+        return mPipelineRunning;
+    }
+
+    /**
+     * Returns the file descriptor used by GStreamer.
+     * The pipeline has to be running, otherwise -1 will be returned.
+     * \return The fd or -1 if not available.
+     */
+    inline int getFileDescriptor() {
+        return mFileDescriptor;
+    }
+
  private:
     CamGst();
 
     /**
      * Use CamConfig to find and set valid camera parameters
      * (driver will choose most suitable).
-     * Sets the member variables as well.
+     * Each parameter which is 0 will get the last stored value of the camera.
      */
-    void setCameraParameters(uint32_t width, uint32_t height, uint32_t fps);
+    void setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps,
+            uint32_t* fpeg_quality);
 
     GstElement* createDefaultSource(std::string const& device);
 
@@ -120,6 +142,19 @@ class CamGst {
     GstElement* createDefaultEncoder(int32_t const jpeg_quality);
 
     GstElement* createDefaultSink();
+
+    /**
+     * Set 'mFileDescriptor' to the fd of the current source (e.g. v4l2).
+     * To get a valid fd the pipeline has to be running.
+     * \return true if the pipeline is running and the 
+     * fd could be requested.
+     */
+    bool readFileDescriptor();
+
+    inline void rmFileDescriptor() {
+        mFileDescriptor = -1;
+        std::cout << "FD set back to -1" << std::endl;
+    }
 
  private: // STATIC METHODS
     static void* mainLoop(void* ptr);
@@ -133,7 +168,6 @@ class CamGst {
 
  private:
     std::string mDevice;
-    CamConfig* mpCamConfig;
     uint32_t mJpegQuality;
     GMainLoop* mLoop;
     pthread_t* mMainLoopThread;
@@ -143,6 +177,9 @@ class CamGst {
     static uint32_t mBufferSize;
     static pthread_mutex_t mMutexBuffer;
     static bool mNewBuffer;
+
+    GstElement* mSource; // Used to request the fd.
+    int mFileDescriptor; // File descriptor of the pipeline source. -1 if not available.
 };
 
 } // end namespace camera
