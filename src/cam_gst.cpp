@@ -248,12 +248,13 @@ GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
         element = gst_element_factory_create (factory, "default_encoder");
     } else {
         element = gst_element_factory_make ("jpegenc", "default_encoder");
+        g_object_set (G_OBJECT (element), 
+            "quality", jpeg_quality, 
+            (void*)NULL);
     }
     if(element == NULL)
         throw CamGstException("Default encoder could not be created.");
-    g_object_set (G_OBJECT (element), 
-            "quality", jpeg_quality, 
-            (void*)NULL);
+
     return element;
 }
 
