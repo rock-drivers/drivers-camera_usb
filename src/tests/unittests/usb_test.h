@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(buffer_test) {
     std::cout << "Close camera and change frame settings to 640,640,MODE_JPEG, 3" << std::endl;
     usb.close();
     base::samples::frame::frame_size_t size(640,640);
-    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_PJPG, 3));
+    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
 
     BOOST_CHECK(usb.grab() == false);
     BOOST_CHECK(usb.isFrameAvailable() == false);
@@ -58,13 +58,13 @@ BOOST_AUTO_TEST_CASE(buffer_test) {
     BOOST_CHECK(usb.retrieveFrame(frame,1000) == true);
     BOOST_CHECK(frame.getWidth() == 640);
     BOOST_CHECK(frame.getHeight() == 480);
-    BOOST_CHECK(frame.getFrameMode() == base::samples::frame::MODE_PJPG);
+    BOOST_CHECK(frame.getFrameMode() == base::samples::frame::MODE_JPEG);
     usb.close();
     
     std::cout << "Change size to 1280, 720 and request 100 images" << std::endl;
     size.width = 1280;
     size.height = 720;
-    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_PJPG, 3));
+    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
     BOOST_CHECK(usb.retrieveFrame(frame,1000) == false);
     BOOST_CHECK(usb.open(cam_infos[0]) == true);
     BOOST_CHECK(usb.grab(camera::Continuously) == true);

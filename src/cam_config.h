@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#define PRINT_DEBUG 1
+#define PRINT_DEBUG 0
 
 namespace camera 
 {

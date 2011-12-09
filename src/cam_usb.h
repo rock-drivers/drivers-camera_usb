@@ -17,6 +17,8 @@
 #ifndef _CAM_USB_CONFIG_H_
 #define _CAM_USB_CONFIG_H_
 
+#include <sys/time.h>
+
 #include "camera_interface/CamInterface.h"
 
 #include "cam_gst.h"
@@ -169,7 +171,7 @@ class CamUsb : public CamInterface {
 
     /**
      * If necessary 'size' will be changed to a valid one. 'mode' should be set to
-     * base::samples::frame::MODE_PJPG and 'color_depth' to 3.
+     * base::samples::frame::MODE_JPEG and 'color_depth' to 8.
      */
     bool setFrameSettings(const base::samples::frame::frame_size_t size,
                                 const base::samples::frame::frame_mode_t mode,
@@ -239,6 +241,16 @@ class CamUsb : public CamInterface {
  private:
     CamUsb(){};
 
+    double calculateFPS() {
+        timeval stop_time_grabbing;
+        gettimeofday(&stop_time_grabbing, 0);
+        double sec = stop_time_grabbing.tv_sec - mStartTimeGrabbing.tv_sec;
+        if(sec == 0)
+            return 0;
+        else
+            return mReceivedFrameCounter / sec;
+    }
+
     CamGst* mCamGst;
     std::string mDevice;
 
@@ -249,7 +261,11 @@ class CamUsb : public CamInterface {
 
     std::map<int_attrib::CamAttrib, int> mMapAttrsCtrlsInt;
 
-    uint32_t mFps;
+    // Framerate set on the camera internally. If available it will set to > 0 during startup.
+    // Will be set if the pipeline is not running and the fps of the camera is requested.
+    double mFps;
+    timeval mStartTimeGrabbing;
+    int mReceivedFrameCounter;
     
     // FD driven image receiving (?).
     void (*mpCallbackFunction)(const void* p);

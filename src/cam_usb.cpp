@@ -4,7 +4,8 @@ namespace camera
 {
 
 CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), 
-        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0),
+        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0), 
+        mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
     #if PRINT_DEBUG
     std::cout << "CamUsb: constructor" << std::endl;
@@ -59,7 +60,7 @@ bool CamUsb::open(const CamInfo &cam,const AccessMode mode) {
     mCamInfo = cam; // Assign camera (not allowed in listCameras()).
 
     // If one of the parameters is 0, the current setting of the camera is used.
-    mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, mFps);
+    mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, (uint32_t)mFps);
     mIsOpen = true;
 
     // Will be started in grab().
@@ -109,8 +110,15 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
             break;
         case SingleFrame:
         case MultiFrame:
-        case Continuously:
-            return mCamGst->startPipeline();
+        case Continuously: {
+            bool pipeline_started = false;
+            pipeline_started = mCamGst->startPipeline();
+            mReceivedFrameCounter = 0;
+            if(pipeline_started) {
+                gettimeofday(&mStartTimeGrabbing, 0);
+            }
+            return pipeline_started;
+        }
         default: 
             throw std::runtime_error("The grab mode is not supported by the camera!");
     }
@@ -139,7 +147,10 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
     frame.init(image_size_.width, image_size_.height, image_color_depth_, image_mode_, 0, buf_size);
     frame.setImage((char*)buffer, buf_size);
     frame.frame_status = base::samples::frame::STATUS_VALID;
+    frame.time = base::Time::now();
     delete buffer; buffer = NULL;
+
+    mReceivedFrameCounter++;
     return true;
 }
 
@@ -170,7 +181,7 @@ bool CamUsb::setAttrib(const int_attrib::CamAttrib attrib, const int value) {
     std::cout << "CamUsb: setAttrib int" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before setting an int attribute." << std::endl;        
         return false;
     }
 
@@ -190,7 +201,7 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
     std::cout << "CamUsb: seAttrib double" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before setting a double attribute." << std::endl;        
         return false;
     }
 
@@ -200,10 +211,8 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
 
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            // Following line throws ERROR Could not write stream parameter: Device or resource busy.
-            // Just set the member variable mFps. If the camera is closed and reopen, the
-            // new fps will take into account.
             config.writeFPS((uint32_t)value);
+            mFps = value;
             break;
         }
         default:
@@ -225,7 +234,7 @@ bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
     std::cout << "CamUsb: setAttrib enum" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before setting an enum attribute." << std::endl;        
         return false;
     }
 
@@ -273,7 +282,7 @@ bool CamUsb::isAttribAvail(const int_attrib::CamAttrib attrib) {
     std::cout << "CamUsb: isAttribAvail int" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before checking whether an int attribute is available." << std::endl;        
         return false;
     }
 
@@ -290,9 +299,15 @@ bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
     #if PRINT_DEBUG
     std::cout << "CamUsb: isAttribAvail double" << std::endl;
     #endif
+    
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
-        return false;
+        // mFps will only be set if the double attribute FrameRate or StatFrameRate is available.
+        if((attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) && mFps != 0) { 
+            return true;
+        } else {
+            std::cerr << "Stop image requesting before checking whether an double attribute is available: " << attrib << std::endl;        
+            return false;
+        }
     }
 
     CamConfig config(mDevice);
@@ -314,7 +329,7 @@ bool CamUsb::isAttribAvail(const enum_attrib::CamAttrib attrib) {
     std::cout << "CamUsb:isAttriAvail enum " << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before checking whether an enum attribute is available." << std::endl;        
         return false;
     }
 
@@ -346,8 +361,8 @@ int CamUsb::getAttrib(const int_attrib::CamAttrib attrib) {
     std::cout << "CamUsb: getAttrib int" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
-        return false;
+        std::cerr << "Stop image requesting before getting an int attribute." << std::endl;        
+        return 0;
     }
 
     CamConfig config(mDevice);
@@ -367,8 +382,13 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
     std::cout << "CamUsb: getAttrib double" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
-        return false;
+        // If FrameRate or StatFrameRate is requested, the current fps are returned if the pipeline is running,
+        // otherwise the fps which is set on the camera. 
+        if(attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) {
+            return calculateFPS();
+        }
+        std::cerr << "Stop image requesting before getting a double attribute." << std::endl;        
+        return 0.0;
     }
 
     CamConfig config(mDevice);
@@ -378,7 +398,8 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
         case double_attrib::StatFrameRate: {
             uint32_t fps;
             config.readFPS(&fps);
-            return (double)mFps;
+            mFps = (double)fps;
+            return mFps;
         }
         default:
             throw std::runtime_error("Unknown attribute!");
@@ -390,7 +411,7 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
     std::cout << "CamUsb: isAttribSet enum" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before check whether a enum attribute is set." << std::endl;        
         return false;
     }
 
@@ -433,12 +454,12 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
     std::cout << "CamUsb: setFrameSettings" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop the device before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop the device before setting frame settings." << std::endl;        
         return false;
     }
 
-    if(mode != base::samples::frame::MODE_PJPG)
-        std::cout << "Warning: mode should be set to base::samples::frame::MODE_PJPG!" << std::endl;
+    if(mode != base::samples::frame::MODE_JPEG)
+        std::cout << "Warning: mode should be set to base::samples::frame::MODE_JPEG!" << std::endl;
     
     if(color_depth != 8)
         std::cout << "Warning: color_depth should be set to 8!" << std::endl;
@@ -481,7 +502,7 @@ bool CamUsb::setToDefault() {
     std::cout << "CamUsb: setToDefault" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before set camera parameters to default." << std::endl;        
         return false;
     }
 
@@ -496,7 +517,7 @@ void CamUsb::getRange(const int_attrib::CamAttrib attrib,int &imin,int &imax) {
     std::cout << "CamUsb: getRange" << std::endl;
     #endif
     if(mCamGst->isPipelineRunning()) {
-        std::cerr << "Stop image requesting before reading and writing attributes." << std::endl;        
+        std::cerr << "Stop image requesting before requesting range." << std::endl;        
         return;
     }
 
