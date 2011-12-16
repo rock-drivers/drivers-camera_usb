@@ -144,7 +144,7 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
         return false;
     }
 
-    frame.init(image_size_.width, image_size_.height, image_color_depth_, image_mode_, 0, buf_size);
+    frame.init(image_size_.width, image_size_.height, 8, image_mode_, 0, buf_size);
     frame.setImage((char*)buffer, buf_size);
     frame.frame_status = base::samples::frame::STATUS_VALID;
     frame.time = base::Time::now();
@@ -461,8 +461,7 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
     if(mode != base::samples::frame::MODE_JPEG)
         std::cout << "Warning: mode should be set to base::samples::frame::MODE_JPEG!" << std::endl;
     
-    if(color_depth != 8)
-        std::cout << "Warning: color_depth should be set to 8!" << std::endl;
+    std::cout << "color_depth is set to " << (int)color_depth << std::endl;
 
     CamConfig config(mDevice);
     config.writeImagePixelFormat(size.width, size.height); // use V4L2_PIX_FMT_YUV420?
@@ -476,7 +475,7 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
 
     image_size_ = size_tmp;
     image_mode_ = mode;
-    image_color_depth_ = 3;//color_depth;
+    image_color_depth_ = color_depth;
     return true;
 }
 

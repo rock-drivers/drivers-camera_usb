@@ -171,7 +171,7 @@ class CamUsb : public CamInterface {
 
     /**
      * If necessary 'size' will be changed to a valid one. 'mode' should be set to
-     * base::samples::frame::MODE_JPEG and 'color_depth' to 8.
+     * base::samples::frame::MODE_JPEG and 'color_depth' to the bytes per pixel.
      */
     bool setFrameSettings(const base::samples::frame::frame_size_t size,
                                 const base::samples::frame::frame_mode_t mode,
