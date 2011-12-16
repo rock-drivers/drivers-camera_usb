@@ -195,7 +195,7 @@ class CamConfig
 
     bool getImageColorspace(enum v4l2_colorspace* colorspace);
 
- public: // STREAMPARM
+ public: // STREAMPARM, not suuported by e-CAM32!
     void readStreamparm();
 
     /**

@@ -3,8 +3,4 @@ rock_library(camera_usb
     HEADERS cam_config.h cam_gst.h cam_usb.h
     DEPS_PKGCONFIG camera_interface gst_dsp_arm)
 
-rock_executable(camera_usb_bin 
-    SOURCES Main.cpp
-    DEPS camera_usb)
-
 add_subdirectory(tests)

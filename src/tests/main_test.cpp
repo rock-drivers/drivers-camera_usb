@@ -3,7 +3,7 @@
 int main(int argc, char* argv[]) 
 {
     using namespace camera;
-
+    /*
     CamUsb usb("/dev/video0");
     std::vector<camera::CamInfo> cam_infos;
 
@@ -24,6 +24,29 @@ int main(int argc, char* argv[])
     usb.retrieveFrame(frame,1000);
     std::cout << "width " << frame.getWidth() << "height " << frame.getHeight() << " mode " << frame.getFrameMode() << std::endl;
     usb.close();
-    
+    */
+
+    CamUsb usb("/dev/video0");
+
+    base::samples::frame::frame_size_t size(640,480);
+    usb.setFrameSettings(size, base::samples::frame::MODE_PJPG, 3);
+
+    struct CamInfo cam;
+    if(usb.open(cam))
+        std::cout << "opened" << std::endl;
+    else
+        std::cout << "not opened" << std::endl;
+
+    if(usb.grab(camera::Continuously))
+        std::cout << "started" << std::endl;
+    else 
+        std::cout << "not started" << std::endl;
+    base::samples::frame::Frame frame;
+    if(usb.retrieveFrame(frame,1000)) 
+        std::cout << "retrieved" << std::endl;
+    else
+        std::cout << "not retrieved" << std::endl;
+
+    usb.close();
 }
 
