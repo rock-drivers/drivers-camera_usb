@@ -393,9 +393,10 @@ BOOST_AUTO_TEST_CASE(image_test)
     cam_config->listImageFormat();
 
     // Change pixel format.
-    cam_config->writeImagePixelFormat(640, 480, V4L2_PIX_FMT_MJPEG);
-    std::cout << std::endl;
-    cam_config->listImageFormat();
+    // MJPEG not available on Gumstix.
+    //cam_config->writeImagePixelFormat(640, 480, V4L2_PIX_FMT_MJPEG);
+    //std::cout << std::endl;
+    //cam_config->listImageFormat();
 
     delete cam_config;  
 }
@@ -410,11 +411,13 @@ BOOST_AUTO_TEST_CASE(stream_test)
     cam_config->listStreamparm();
     std::cout << std::endl;
 
-    BOOST_CHECK(cam_config->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME) == true);
-    BOOST_CHECK(cam_config->hasCapturemodeStreamparm(V4L2_MODE_HIGHQUALITY) == false);
+    //BOOST_CHECK(cam_config->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME) == true);
+    //BOOST_CHECK(cam_config->hasCapturemodeStreamparm(V4L2_MODE_HIGHQUALITY) == false);
 
-    BOOST_REQUIRE_NO_THROW(cam_config->writeStreamparm(1, 20));
-    cam_config->listStreamparm();
+    if(cam_config->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME)) {
+        BOOST_REQUIRE_NO_THROW(cam_config->writeStreamparm(1, 20));
+        cam_config->listStreamparm();
+    }
   
     delete cam_config;  
 }
