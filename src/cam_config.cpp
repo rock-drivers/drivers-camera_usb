@@ -18,7 +18,7 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     memset(&mFormat, 0, sizeof(struct v4l2_format));
     memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
-    mFd = open(device.c_str(), O_NONBLOCK | O_RDWR);
+    mFd = ::open(device.c_str(), O_NONBLOCK | O_RDWR);
     if (mFd <= 0) {
         std::string err_str(strerror(errno));
         throw std::runtime_error(err_str.insert(0, "Could not open device: "));
@@ -158,52 +158,65 @@ void CamConfig::readControl() {
     for (queryctrl_tmp.id = V4L2_CID_BASE; 
             queryctrl_tmp.id < V4L2_CID_LASTP1;
             queryctrl_tmp.id++) {
+        readControl(queryctrl_tmp);
+    }
 
-        // Control-request successful?
-        if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
-            // Control available by the camera (continue if not)?
-            if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED)
-                continue;
+    // Checks private controls of the e-CAM32_OMAP_GSTIX
+    for (queryctrl_tmp.id = V4L2_CID_PRIVATE_BASE + 1; 
+            queryctrl_tmp.id < V4L2_CID_PRIVATE_BASE + 17;
+            queryctrl_tmp.id++) {
+        readControl(queryctrl_tmp);
+    }
+}
 
-            // Create and fill CamCtrl object.
-            CamCtrl cam_ctrl;
-            cam_ctrl.mCtrl = queryctrl_tmp;
+void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
+    // Control-request successful?
+    if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
+        // Control available by the camera (continue if not)?
+        if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) { // PRINT INFO MESSAGE HERE
+            //std::cout << "control id " << queryctrl_tmp.id << " not available" << std::endl; 
+            return;
+        }
 
-            // Read menue entries if available.
-            if (queryctrl_tmp.type == V4L2_CTRL_TYPE_MENU) {
-                
-                struct v4l2_querymenu querymenu_tmp;
-                memset (&querymenu_tmp, 0, sizeof (struct v4l2_querymenu));
-                querymenu_tmp.id = queryctrl_tmp.id;
+        // Create and fill CamCtrl object.
+        CamCtrl cam_ctrl;
+        cam_ctrl.mCtrl = queryctrl_tmp;
 
-                // Store menu item names if the type of the control is a menu. 
-                for (int i = queryctrl_tmp.minimum; i <= queryctrl_tmp.maximum; ++i) {
-                    querymenu_tmp.index = (uint32_t)i;
-                    if (0 == ioctl (mFd, VIDIOC_QUERYMENU, &querymenu_tmp)) {
-                        // Store names of the menu items.
-                        char buffer[32];
-                        snprintf(buffer, 32, "%s", querymenu_tmp.name);
-                        cam_ctrl.mMenuItems.push_back(buffer);
-                    } else {
-                        std::string err_str(strerror(errno));
-                        throw std::runtime_error(err_str.insert(0, 
-                            "Could not read menu item: "));
-                    }
+        // Read menue entries if available.
+        if (queryctrl_tmp.type == V4L2_CTRL_TYPE_MENU) {
+            
+            struct v4l2_querymenu querymenu_tmp;
+            memset (&querymenu_tmp, 0, sizeof (struct v4l2_querymenu));
+            querymenu_tmp.id = queryctrl_tmp.id;
+
+            // Store menu item names if the type of the control is a menu. 
+            for (int i = queryctrl_tmp.minimum; i <= queryctrl_tmp.maximum; ++i) {
+                querymenu_tmp.index = (uint32_t)i;
+                if (0 == ioctl (mFd, VIDIOC_QUERYMENU, &querymenu_tmp)) {
+                    // Store names of the menu items.
+                    char buffer[32];
+                    snprintf(buffer, 32, "%s", querymenu_tmp.name);
+                    cam_ctrl.mMenuItems.push_back(buffer);
+                } else {
+                    std::string err_str(strerror(errno));
+                    throw std::runtime_error(err_str.insert(0, 
+                        "Could not read menu item: "));
                 }
             }
-
-            // Read and store current value.
-            cam_ctrl.mValue = readControlValue(queryctrl_tmp.id);
-
-            // Store CamCtrl using control ID as key.
-            mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(cam_ctrl.mCtrl.id, cam_ctrl));
-        } else {
-            if (errno == EINVAL) {
-                continue;
-            }
-            std::string err_str(strerror(errno));
-            throw std::runtime_error(err_str.insert(0, "Could not read control object: "));
         }
+
+        // Read and store current value.
+        cam_ctrl.mValue = readControlValue(queryctrl_tmp.id);
+
+        // Store CamCtrl using control ID as key.
+        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(cam_ctrl.mCtrl.id, cam_ctrl));
+    } else {
+        if (errno == EINVAL) {
+            //std::cout << "control id " << queryctrl_tmp.id << " not available" << std::endl;
+            return;
+        }
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not read control object: "));
     }
 }
 

@@ -14,6 +14,7 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mLoop(NULL),
         mMainLoopThread(NULL),
         mPipeline(NULL),
+        mGstPipelineBus(NULL),
         mPipelineRunning(false),
         mSource(NULL),
         mFileDescriptor(-1) {
@@ -69,10 +70,12 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
     }
 
     // Add a message handler.
-    GstBus* bus = NULL;
-    bus = gst_pipeline_get_bus (GST_PIPELINE (mPipeline));
-    gst_bus_add_watch (bus, callbackMessages, this);
-    gst_object_unref (bus);    
+    if(mGstPipelineBus != NULL) {
+        gst_object_unref (mGstPipelineBus); 
+        mGstPipelineBus = NULL;
+    }
+    mGstPipelineBus = gst_pipeline_get_bus (GST_PIPELINE (mPipeline));
+    gst_bus_add_watch (mGstPipelineBus, callbackMessages, this);   
 }
 
 void CamGst::deletePipeline() {
@@ -87,6 +90,7 @@ void CamGst::deletePipeline() {
     mNewBuffer = false;
 }
 
+// Print GstMessage
 bool CamGst::startPipeline() {
     if(mPipeline == NULL) 
         return false;
@@ -109,6 +113,18 @@ bool CamGst::startPipeline() {
     }
 
     mPipelineRunning = (ret_state == GST_STATE_CHANGE_SUCCESS ? true : false);
+
+    if(!mPipelineRunning) {
+        GstMessage *msg;
+        msg = gst_bus_poll (mGstPipelineBus, GST_MESSAGE_ERROR, 0);
+        if (msg) {
+            GError *err = NULL;
+            gst_message_parse_error (msg, &err, NULL);
+            g_print ("ERROR: %s\n", err->message);
+            g_error_free (err);
+            gst_message_unref (msg);
+        }
+    }
 
     // Tries to set the file descriptor as well.
     readFileDescriptor();
@@ -224,6 +240,7 @@ GstElement* CamGst::createDefaultSource(std::string const& device) {
     return element;
 }
 
+// remove format, bb to 24?
 GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps ) {
     GstElement* element = gst_element_factory_make("capsfilter", "default_cap");
     if(element == NULL)
@@ -232,20 +249,25 @@ GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height
     g_object_set (G_OBJECT (element), 
             // Create capability.
             "caps", gst_caps_new_simple ("video/x-raw-yuv",
-            "format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('I', '4', '2', '0'),
+            //"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('I', '4', '2', '0'),
             "width", G_TYPE_INT, width,
             "height", G_TYPE_INT, height,
             "framerate", GST_TYPE_FRACTION, fps, 1,
+            "bpp", G_TYPE_INT, 24,
             (void*)NULL), 
         (void*)NULL);
     return element;
 }
 
+// mode to 1 - streaming?
 GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
     GstElementFactory* factory = gst_element_factory_find ("dspjpegenc");
     GstElement* element = NULL;
     if(factory != NULL) {
         element = gst_element_factory_create (factory, "default_encoder");
+        g_object_set (G_OBJECT (element), 
+            "mode", 1, 
+            (void*)NULL);
     } else {
         element = gst_element_factory_make ("jpegenc", "default_encoder");
         g_object_set (G_OBJECT (element), 
@@ -258,14 +280,15 @@ GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
     return element;
 }
 
+// removes max-buffers and drop?
 GstElement* CamGst::createDefaultSink() {
     GstElement* element  = gst_element_factory_make("appsink", "default_buffer_sink");
     if(element == NULL)
         throw CamGstException("Default sink could not be created.");
     g_object_set (G_OBJECT (element), 
             "sync", FALSE, 
-            "max_buffers", 8,
-            "drop", FALSE,
+            //"max_buffers", 8,
+            //"drop", FALSE,
             (void*)NULL);
 	gst_app_sink_set_emit_signals ((GstAppSink*) element, TRUE);
 
@@ -303,14 +326,14 @@ void* CamGst::mainLoop(void* ptr) {
 
 gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
 {
-    CamGst* cam_gst = (CamGst*)data;
+    //CamGst* cam_gst = (CamGst*)data;
     //g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (msg));
 
     switch (GST_MESSAGE_TYPE (msg)) {
 
         case GST_MESSAGE_EOS:
             g_print ("End of stream\n");
-            cam_gst->deletePipeline();
+            //cam_gst->deletePipeline();
         break;
 
         case GST_MESSAGE_ERROR: {
@@ -322,7 +345,7 @@ gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
 
             g_printerr ("Error: %s\n", error->message);
             g_error_free (error);
-            cam_gst->deletePipeline();
+            //cam_gst->deletePipeline();
         break;
         }
         default: break;

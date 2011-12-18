@@ -172,6 +172,7 @@ class CamGst {
     GMainLoop* mLoop;
     pthread_t* mMainLoopThread;
     GstElement* mPipeline;
+    GstBus* mGstPipelineBus;
     bool mPipelineRunning;
     static GstBuffer* mBuffer;
     static uint32_t mBufferSize;

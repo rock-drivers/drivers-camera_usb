@@ -6,6 +6,15 @@
 #include <string.h> // for strerror()
 #include <linux/videodev2.h>
 
+// for v4l2 api (everything required?)
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -87,7 +96,18 @@ class CamConfig
     bool hasCapability(uint32_t capability_field);
 
  public: // CONTROL
+    /**
+     * Generates a list of valid controls requesting all base and private base controls ids.
+     * The private base control ids of the e-CAM32 are requested as well (see
+     * omap_v4l2.h of the e-CAM32 driver source).
+     * readControl(struct v4l2_queryctrl& queryctrl_tmp) doing the main job here.
+     */
     void readControl();
+
+    /**
+     * Stores the supported control ids and their current values. 
+     */
+    void readControl(struct v4l2_queryctrl& queryctrl_tmp);
 
     /**
      * Requests current value from the camera directly.
