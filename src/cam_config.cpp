@@ -166,26 +166,35 @@ void CamConfig::readControl() {
     mCamCtrls.clear();
 
     // Checks which controls are offered by the camera / device-driver.
-    for (queryctrl_tmp.id = V4L2_CID_BASE; 
-            queryctrl_tmp.id < V4L2_CID_LASTP1;
-            queryctrl_tmp.id++) {
+    for (int i = V4L2_CID_BASE; 
+            i < V4L2_CID_LASTP1;
+            i++) {
+        queryctrl_tmp.id = i;
         readControl(queryctrl_tmp);
     }
 
     // Checks private controls of the e-CAM32_OMAP_GSTIX
-    for (queryctrl_tmp.id = V4L2_CID_PRIVATE_BASE + 1; 
-            queryctrl_tmp.id < V4L2_CID_PRIVATE_BASE + 17;
-            queryctrl_tmp.id++) {
+    for (int i = V4L2_CID_PRIVATE_BASE + 1; 
+            i < V4L2_CID_PRIVATE_BASE + 17;
+            i++) {
         readControl(queryctrl_tmp);
     }
 }
 
 void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
+    // Store control id because it could be changed by the driver.
+    unsigned int original_control_id = queryctrl_tmp.id;
+
     // Control-request successful?
     if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
         // Control available by the camera (continue if not)?
         if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) { // PRINT INFO MESSAGE HERE
             //std::cout << "control id " << queryctrl_tmp.id << " not available" << std::endl; 
+            return;
+        }
+
+        // Driver seems not to like the control.
+        if (queryctrl_tmp.id != original_control_id) {
             return;
         }
 
