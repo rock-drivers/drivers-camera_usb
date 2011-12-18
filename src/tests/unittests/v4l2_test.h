@@ -1,22 +1,21 @@
 #ifndef _V4L2_TEST_H_
 #define _V4L2_TEST_H_
 
-#include <linux/videodev2.h>
-#include <sys/ioctl.h>
+#include "camera_usb/cam_config.h"
 
 #include <map>
 #include <string>
 
-#include "camera_usb/cam_config.h"
-
 BOOST_AUTO_TEST_SUITE(v4l2_test_suite)
 
-#if 0
+//#if 1
 int fd = 0;
 
 BOOST_AUTO_TEST_CASE(open_camera_video)
-{	
+{
+    printf("open video device\n");	
     fd = ::open("/dev/video0",O_NONBLOCK | O_RDWR);
+    
 	if (fd <= 0) {
 		printf("Cannot open device\n");
 		perror("Error:");
@@ -118,12 +117,16 @@ BOOST_AUTO_TEST_CASE(read_controls)
     memset (&queryctrl, 0, sizeof (struct v4l2_queryctrl));
     valid_ids.clear();
 
-    for (queryctrl.id = V4L2_CID_BASE; 
-            queryctrl.id < V4L2_CID_LASTP1;
-            queryctrl.id++) {
+    for (int j = V4L2_CID_BASE; 
+            j < V4L2_CID_LASTP1;
+            j++) {
+        queryctrl.id = j;
         // Read control informations if control is available.
         if (0 == ioctl (fd, VIDIOC_QUERYCTRL, &queryctrl)) {
             if (queryctrl.flags & V4L2_CTRL_FLAG_DISABLED)
+                continue;
+                
+            if(j != queryctrl.id)
                 continue;
 
             char name_buffer[32];
@@ -131,7 +134,8 @@ BOOST_AUTO_TEST_CASE(read_controls)
             std::string name_str(name_buffer);
             valid_ids.insert(std::pair<std::string, int>(name_str, (int)queryctrl.id));        
                        
-            printf ("ID %d, Type %d, Name %s, Min %d, Max %d, Step %d, Default %d, Flags %d\n", 
+            printf ("j %d, ID %d, Type %d, Name %s, Min %d, Max %d, Step %d, Default %d, Flags %d\n", 
+                j,
                 queryctrl.id - V4L2_CID_BASE,
                 queryctrl.type,
                 queryctrl.name,
@@ -223,7 +227,6 @@ enum v4l2_buf_type {
 #if 1
 	// Experimental
 	V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY = 8,
-#endif
 	V4L2_BUF_TYPE_PRIVATE              = 0x80,
 };
 
@@ -279,11 +282,15 @@ BOOST_AUTO_TEST_CASE(request_image_format) {
         printf("format type not supported");
     }
 }
-#endif
+
+BOOST_AUTO_TEST_CASE(close_fd) {
+    BOOST_CHECK(0 == ::close(fd));
+    sleep(1);
+}
 
 BOOST_AUTO_TEST_CASE(capability_test) 
 {
-    std::cout << std::endl;
+    std::cout << "Capability test" << std::endl;
     camera::CamConfig* cam_config;
 
     BOOST_REQUIRE_NO_THROW(cam_config = new camera::CamConfig("/dev/video0"));
@@ -301,7 +308,7 @@ BOOST_AUTO_TEST_CASE(capability_test)
 
 BOOST_AUTO_TEST_CASE(control_test) 
 {
-    std::cout << std::endl;
+    std::cout << "control test " << std::endl;
     camera::CamConfig* cam_config;
 
     BOOST_REQUIRE_NO_THROW(cam_config = new camera::CamConfig("/dev/video0"));
@@ -367,7 +374,7 @@ BOOST_AUTO_TEST_CASE(control_test)
 
 BOOST_AUTO_TEST_CASE(image_test) 
 {
-    std::cout << std::endl;
+    std::cout << "image test " << std::endl;
     camera::CamConfig* cam_config;
     BOOST_REQUIRE_NO_THROW(cam_config = new camera::CamConfig("/dev/video0"));
 
@@ -395,7 +402,7 @@ BOOST_AUTO_TEST_CASE(image_test)
 
 BOOST_AUTO_TEST_CASE(stream_test) 
 {
-    std::cout << std::endl;
+    std::cout << "stream test " << std::endl;
     camera::CamConfig* cam_config;
     BOOST_REQUIRE_NO_THROW(cam_config = new camera::CamConfig("/dev/video0"));
     

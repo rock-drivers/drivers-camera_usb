@@ -22,6 +22,8 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     if (mFd <= 0) {
         std::string err_str(strerror(errno));
         throw std::runtime_error(err_str.insert(0, "Could not open device: "));
+    } else {
+        std::cout << "File opened: " << mFd << std::endl;
     }
 
     // Catches CamConfigException (not supported functionalities).
@@ -57,6 +59,9 @@ CamConfig::~CamConfig() {
 
 // CAPABILITY
 void CamConfig::readCapability() {
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: readCapability" << std::endl;
+    #endif
     memset (&mCapability, 0, sizeof (struct v4l2_capability));
 
     if (ioctl(mFd, VIDIOC_QUERYCAP, &mCapability) != 0) {
@@ -70,6 +75,9 @@ void CamConfig::readCapability() {
 }
 
 void CamConfig::listCapabilities() {
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: listCapabilities" << std::endl;
+    #endif
     std::cout << "Driver: " << getCapabilityDriver() << std::endl;
     std::cout << "Card: " << getCapabilityCard() << std::endl;
     std::cout << "Bus Info: " << getCapabilityBusInfo() << std::endl;
@@ -150,6 +158,9 @@ bool CamConfig::hasCapability(uint32_t capability_field) {
 
 // CONTROL
 void CamConfig::readControl() {
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: readControl" << std::endl;
+    #endif
     struct v4l2_queryctrl queryctrl_tmp;
     memset (&queryctrl_tmp, 0, sizeof (struct v4l2_queryctrl));
     mCamCtrls.clear();
@@ -429,7 +440,9 @@ void CamConfig::setControlValuesToDefault() {
 
 // IMAGE
 void CamConfig::readImageFormat() {
-
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: readImageFormat" << std::endl;
+    #endif
     memset(&mFormat, 0, sizeof(struct v4l2_format));
 
     // struct v4l2_pix_format should be requested.
@@ -563,6 +576,9 @@ bool CamConfig::getImageColorspace(enum v4l2_colorspace* colorspace) {
 
 // STREAMPARM
 void CamConfig::readStreamparm() {
+    #if PRINT_DEBUG
+    std::cout << "CamConfig: readStreamparm" << std::endl;
+    #endif
     memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
     mStreamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;

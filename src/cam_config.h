@@ -1,26 +1,25 @@
 #ifndef _CAM_V4L2_CONFIG_H_
 #define _CAM_V4L2_CONFIG_H_
 
-#include <errno.h>
-#include <stdint.h>
-#include <string.h> // for strerror()
-#include <linux/videodev2.h>
-
 // for v4l2 api (everything required?)
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <linux/videodev2.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+#include <errno.h>
+#include <string.h>
 
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#define PRINT_DEBUG 0
+#define PRINT_DEBUG 1
 
 namespace camera 
 {
