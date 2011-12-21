@@ -380,7 +380,7 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
     LOG_DEBUG("CamGst: callbackNewBuffer");
     pthread_mutex_lock(&mMutexBuffer);
     if(mBuffer != NULL) {
-        LOG_WARN("No image data available");
+        LOG_DEBUG("Unref old image buffer");
         gst_buffer_unref(mBuffer);
         mBufferSize = 0; 
     }
