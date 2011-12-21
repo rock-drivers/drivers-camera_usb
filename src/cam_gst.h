@@ -1,3 +1,17 @@
+/*
+ * \file    cam_gst.h
+ *  
+ * \brief   Allows to create a default GStreamer pipeline, which requests images using v4l2, 
+ *          converts them to jpegs and gives access to the image data. 
+ *          
+ *          German Research Center for Artificial Intelligence\n
+ *          Project: Rimres
+ *
+ * \date    23.11.11
+ *
+ * \author  Stefan.Haase@dfki.de
+ */
+
 #ifndef _CAM_GST_CONFIG_H_
 #define _CAM_GST_CONFIG_H_
 
@@ -26,6 +40,10 @@ class CamGstException : public std::runtime_error {
 };
 
 /**
+ * Allows to create a default GStreamer pipeline, which requests images using v4l2,
+ * converts them to jpegs and gives access to the image data.
+ * Successfully tested with the Microsoft LifeCam Cinema Web camera and 
+ * the Gumstix e-CAM32 camera. 
  * Still problem with calling gst_init() several times?
  * E.g. its not possible to create one object of CamGst, remove it,
  * create another, try to create a default source -> not possible. Why?

@@ -18,16 +18,19 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mPipelineRunning(false),
         mSource(NULL),
         mFileDescriptor(-1) {
+    LOG_DEBUG("CamGst: constructor");
     // gst_is_initialiszed() not available (since 0.10.31), 
     // could lead to a gst-mini-unref-warning.
     gst_init(NULL, NULL);
     mLoop = g_main_loop_new (NULL, FALSE);
     pthread_mutex_init(&mMutexBuffer, NULL);
+    LOG_DEBUG("Starting gst main loop thread");
     mMainLoopThread = new pthread_t();
     pthread_create(mMainLoopThread, NULL, mainLoop, (void*)mLoop);
 }
 
 CamGst::~CamGst() {
+    LOG_DEBUG("CamGst: destructor");
     if(mBuffer != NULL) {
         gst_buffer_unref(mBuffer);
         mBufferSize = 0; 
@@ -45,7 +48,7 @@ CamGst::~CamGst() {
 
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
         uint32_t jpeg_quality) {
-    
+    LOG_DEBUG("CamGst: createDefaultPipeline");
     deletePipeline();
 
     // Sets the passed parameters if possible, otherwise valid ones.
@@ -79,8 +82,11 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
 }
 
 void CamGst::deletePipeline() {
-    if(mPipeline == NULL)
+    LOG_DEBUG("CamGst: deletePipeline");
+    if(mPipeline == NULL) {
+        LOG_INFO("Pipeline already deleted, return");
         return;
+    }
     
     stopPipeline();
 
@@ -92,17 +98,23 @@ void CamGst::deletePipeline() {
 
 // Print GstMessage
 bool CamGst::startPipeline() {
-    if(mPipeline == NULL) 
+    LOG_DEBUG("CamGst: startPipeline");
+    if(mPipeline == NULL) {
+        LOG_INFO("No pipeline available, can not be started");
         return false;
+    }
 
-    if(mPipelineRunning)
+    if(mPipelineRunning) {
+        LOG_INFO("Pipeline already running, return true");
         return true;
+    }
 
     GstState state;
     GstStateChangeReturn ret_state;
 
     ret_state = gst_element_set_state(mPipeline, GST_STATE_PLAYING);
- 
+    LOG_DEBUG("Set pipeline to playing returned %d",ret_state); 
+    
     if(ret_state == GST_STATE_CHANGE_ASYNC) {
         // gst_element_get_state will return immediately (other than written in the gst-docu!)
         do {
@@ -120,7 +132,7 @@ bool CamGst::startPipeline() {
         if (msg) {
             GError *err = NULL;
             gst_message_parse_error (msg, &err, NULL);
-            g_print ("ERROR: %s\n", err->message);
+            LOG_ERROR("Pipeline could not be started: %s", err->message);
             g_error_free (err);
             gst_message_unref (msg);
         }
@@ -133,8 +145,11 @@ bool CamGst::startPipeline() {
 }
 
 void CamGst::stopPipeline() {
-    if(!mPipelineRunning)
+    LOG_DEBUG("CamGst: stopPipeline");
+    if(!mPipelineRunning) {
+        LOG_INFO("Pipeline already stopped");
         return;
+    }
 
     // Setting to GST_STATE_NULL does not happen asynchronously, wait until stop.
     gst_element_set_state(mPipeline, GST_STATE_NULL);
@@ -144,6 +159,7 @@ void CamGst::stopPipeline() {
 
 bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read, 
         int32_t timeout) {
+    LOG_DEBUG("CamGst: getBuffer");
     struct timeval start, end;
     long mtime=0, seconds=0, useconds=0; 
     if(timeout > 0) {
@@ -156,6 +172,7 @@ bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read,
                 *buf_size = 0;
                 *buffer = NULL;
                 pthread_mutex_unlock(&mMutexBuffer);
+                LOG_DEBUG("No image available");
                 return false;
             } else {
                 pthread_mutex_unlock(&mMutexBuffer);
@@ -180,7 +197,7 @@ bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read,
             useconds = end.tv_usec - start.tv_usec;
             mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
             if(mtime > timeout) {
-                std::cout << "timeout reached" << std::endl;
+                LOG_INFO("Timeout reached");
                 return false;
             }
         }
@@ -189,6 +206,7 @@ bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read,
 }
 
 bool CamGst::skipBuffer() {
+    LOG_DEBUG("CamGst: skipBuffer");
     bool skipped = false;
     pthread_mutex_lock(&mMutexBuffer);
     skipped = mNewBuffer;
@@ -199,6 +217,7 @@ bool CamGst::skipBuffer() {
 
 void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
         std::string const& file_name) {
+    LOG_DEBUG("CamGst: storeImageToFile");
     FILE* file;
     file = fopen(file_name.c_str(),"w");
   	fwrite (buffer, 1 , buf_size , file);
@@ -210,7 +229,7 @@ void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size,
 CamGst::CamGst() {}
 
 void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps, uint32_t* jpeg_quality) {
-
+    LOG_DEBUG("CamGst: setCameraParameters");
     CamConfig config(mDevice);
 
     // Take the last used values if parameter is 0.
@@ -226,11 +245,11 @@ void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fp
     config.getImageWidth(width);
     config.getImageHeight(height);
     config.getFPS(fps);
-    std::cout << "Set camera parameters: width " << *width << 
-            ", height " << *height << ", fps " << *fps << std::endl;
+    LOG_INFO("Set camera parameters: width %d, height %d, fps %d", *width, *height, *fps); 
 }
 
 GstElement* CamGst::createDefaultSource(std::string const& device) {
+    LOG_DEBUG("createDefaultSource, device: %s",device.c_str());
     GstElement* element = gst_element_factory_make ("v4l2src", "default_source");
     if(element == NULL)
         throw CamGstException("Default source could not be created.");
@@ -242,6 +261,7 @@ GstElement* CamGst::createDefaultSource(std::string const& device) {
 
 // remove format, bb to 24?
 GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps ) {
+    LOG_DEBUG("createDefaultCap, width: %d, height: %d, fps: %d", width, height, fps);
     GstElement* element = gst_element_factory_make("capsfilter", "default_cap");
     if(element == NULL)
         throw CamGstException("Default cap could not be created.");
@@ -264,11 +284,13 @@ GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
     GstElementFactory* factory = gst_element_factory_find ("dspjpegenc");
     GstElement* element = NULL;
     if(factory != NULL) {
+    LOG_DEBUG("createDefaultEncoder dspjpegenc, jpeg_quality: %d", jpeg_quality);
         element = gst_element_factory_create (factory, "default_encoder");
         g_object_set (G_OBJECT (element), 
             "mode", 1, 
             (void*)NULL);
     } else {
+        LOG_DEBUG("createDefaultEncoder jpegenc, jpeg_quality: %d", jpeg_quality);
         element = gst_element_factory_make ("jpegenc", "default_encoder");
         g_object_set (G_OBJECT (element), 
             "quality", jpeg_quality, 
@@ -282,6 +304,7 @@ GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
 
 // removes max-buffers and drop?
 GstElement* CamGst::createDefaultSink() {
+    LOG_DEBUG("CamGst: createDefaultSink");
     GstElement* element  = gst_element_factory_make("appsink", "default_buffer_sink");
     if(element == NULL)
         throw CamGstException("Default sink could not be created.");
@@ -298,9 +321,9 @@ GstElement* CamGst::createDefaultSink() {
 }
 
 bool CamGst::readFileDescriptor(){
+    LOG_DEBUG("CamGst: readFileDescriptor");
     if(!mPipelineRunning || mSource == NULL) {
-        std::cerr << "Pipeline is not running or no source available, "<<
-                "FD could not be requested." << std::endl;
+        LOG_WARN("Pipeline is not running or no source available, FD could not be requested.");
         return false;
     }
 
@@ -308,7 +331,7 @@ bool CamGst::readFileDescriptor(){
     int file_descriptor = -1;
     g_object_get(G_OBJECT (mSource), "device-fd", &file_descriptor, (void*)NULL);
     if(file_descriptor == -1) {
-        std::cerr << "FD could not be requested." << std::endl;
+        LOG_ERROR("FD could not be requested.");
         return false;
     }
     mFileDescriptor = file_descriptor;
@@ -317,22 +340,22 @@ bool CamGst::readFileDescriptor(){
 
 // PRIVATE STATIC
 void* CamGst::mainLoop(void* ptr) {
-    std::cout << "Start main loop " << std::endl;
+    LOG_INFO("Start gst main loop");
     GMainLoop* gmain_loop = (GMainLoop*)ptr;
     g_main_loop_run ((GMainLoop*)gmain_loop);
-    std::cout << "Stop main loop " << std::endl;
+    LOG_INFO("Stop gst main loop");
     return NULL;
 }
 
 gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
 {
     //CamGst* cam_gst = (CamGst*)data;
-    //g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (msg));
+    LOG_DEBUG("GStreamer callback message: %s", GST_MESSAGE_TYPE_NAME (msg));
 
     switch (GST_MESSAGE_TYPE (msg)) {
 
         case GST_MESSAGE_EOS:
-            g_print ("End of stream\n");
+            LOG_INFO("GStreamer end of stream reached.");
             //cam_gst->deletePipeline();
         break;
 
@@ -343,7 +366,7 @@ gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
             gst_message_parse_error (msg, &error, &debug);
             g_free (debug);
 
-            g_printerr ("Error: %s\n", error->message);
+            LOG_INFO("GStreamer error message received: ", error->message);
             g_error_free (error);
             //cam_gst->deletePipeline();
         break;
@@ -354,16 +377,16 @@ gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
 }
 
 void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
-
+    LOG_DEBUG("CamGst: callbackNewBuffer");
     pthread_mutex_lock(&mMutexBuffer);
     if(mBuffer != NULL) {
+        LOG_WARN("No image data available");
         gst_buffer_unref(mBuffer);
         mBufferSize = 0; 
     }
     mBuffer = gst_app_sink_pull_buffer((GstAppSink*)object);
     mBufferSize = GST_BUFFER_SIZE(mBuffer);
     mNewBuffer = true;
-    //std::cout << "new buffer received " << mBuffer << ", size " << mBufferSize << std::endl;
     pthread_mutex_unlock(&mMutexBuffer);
 }   
 } // end namespace camera

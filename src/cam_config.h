@@ -1,3 +1,17 @@
+/*
+ * \file    cam_gst.h
+ *  
+ * \brief   Allows to create a default GStreamer pipeline, which requests images using v4l2, 
+ *          converts them to jpegs and gives access to the image data. 
+ *          
+ *          German Research Center for Artificial Intelligence\n
+ *          Project: Rimres
+ *
+ * \date    23.11.11
+ *
+ * \author  Stefan.Haase@dfki.de
+ */
+
 #ifndef _CAM_V4L2_CONFIG_H_
 #define _CAM_V4L2_CONFIG_H_
 
@@ -19,7 +33,7 @@
 #include <string>
 #include <vector>
 
-#define PRINT_DEBUG 1
+#include <base/logging.h>
 
 namespace camera 
 {
@@ -66,6 +80,8 @@ class CamConfig
      * Opens the device and reads all camera informations.
      * Throws std::runtime_error if the device could not be opened
      * or an io-error occurred.
+     * TODO Remove read...() from constructor, so its up to the user to read the 
+     * required informations?
      */
     CamConfig(std::string const& device);
 

@@ -11,19 +11,19 @@ namespace camera
  
 CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtrls(), 
             mFormat(), mStreamparm() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: constructor" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: constructor");
+    
     memset(&mCapability, 0, sizeof(struct v4l2_capability));
     memset(&mFormat, 0, sizeof(struct v4l2_format));
     memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
     mFd = ::open(device.c_str(), O_NONBLOCK | O_RDWR);
     if (mFd <= 0) {
+        LOG_FATAL("Could not open device %s",device.c_str());
         std::string err_str(strerror(errno));
         throw std::runtime_error(err_str.insert(0, "Could not open device: "));
     } else {
-        std::cout << "File opened: " << mFd << std::endl;
+        LOG_DEBUG("File opened, fd: %d",mFd);
     }
 
     // Catches CamConfigException (not supported functionalities).
@@ -31,37 +31,33 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     try {
         readCapability();
     } catch (CamConfigException& err) {
-        std::cout << err.what() << std::endl;
+        LOG_ERROR("%s",err.what());
     }
     try {
         readControl();
     } catch (CamConfigException& err) {
-        std::cout << err.what() << std::endl;
+        LOG_ERROR("%s",err.what());
     }
     try {
         readImageFormat();
     } catch (CamConfigException& err) {
-        std::cout << err.what() << std::endl;
+        LOG_ERROR("%s",err.what());
     }
     try {
         readStreamparm();
     } catch (CamConfigException& err) {
-        std::cout << err.what() << std::endl;
+        LOG_ERROR("%s",err.what());
     }
 }
 
 CamConfig::~CamConfig() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: destructor" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: destructor, close device");
     close(mFd);
 }
 
 // CAPABILITY
 void CamConfig::readCapability() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: readCapability" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: readCapability");
     memset (&mCapability, 0, sizeof (struct v4l2_capability));
 
     if (ioctl(mFd, VIDIOC_QUERYCAP, &mCapability) != 0) {
@@ -75,48 +71,47 @@ void CamConfig::readCapability() {
 }
 
 void CamConfig::listCapabilities() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: listCapabilities" << std::endl;
-    #endif
-    std::cout << "Driver: " << getCapabilityDriver() << std::endl;
-    std::cout << "Card: " << getCapabilityCard() << std::endl;
-    std::cout << "Bus Info: " << getCapabilityBusInfo() << std::endl;
-    std::cout << "Version: " << getCapabilityVersion() << std::endl;
+    LOG_DEBUG("CamConfig: listCapabilities");
+
+    LOG_INFO("Driver: %s", getCapabilityDriver().c_str());
+    LOG_INFO("Card: %s ", getCapabilityCard().c_str());
+    LOG_INFO("Bus Info: %s", getCapabilityBusInfo().c_str());
+    LOG_INFO("Version: %d", getCapabilityVersion());
 
     uint32_t flag = mCapability.capabilities;
-    std::cout << "Capabilities: " << std::endl;
+    LOG_INFO("Capabilities: ");
     if(flag & V4L2_CAP_VIDEO_CAPTURE) 
-        std::cout << "V4L2_CAP_VIDEO_CAPTURE: The device can capture video data." << std::endl;
+        LOG_INFO("V4L2_CAP_VIDEO_CAPTURE: The device can capture video data.");
     if(flag & V4L2_CAP_VIDEO_OUTPUT) 
-        std::cout << "V4L2_CAP_VIDEO_OUTPUT: The device can perform video output." << std::endl;
+        LOG_INFO("V4L2_CAP_VIDEO_OUTPUT: The device can perform video output.");
     if(flag & V4L2_CAP_VIDEO_OVERLAY) 
-        std::cout << "V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer." << std::endl;
+        LOG_INFO("V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer.");
     if(flag & V4L2_CAP_VBI_CAPTURE) 
-        std::cout << "V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data." << std::endl;
+        LOG_INFO("V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data.");
     if(flag & V4L2_CAP_VBI_OUTPUT) 
-        std::cout << "V4L2_CAP_VBI_OUTPUT: It can do raw VBI output." << std::endl;
+        LOG_INFO("V4L2_CAP_VBI_OUTPUT: It can do raw VBI output.");
     if(flag & V4L2_CAP_SLICED_VBI_CAPTURE) 
-        std::cout << "V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture." << std::endl;
+        LOG_INFO("V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture.");
     if(flag & V4L2_CAP_SLICED_VBI_OUTPUT) 
-        std::cout << "V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output." << std::endl;
+        LOG_INFO("V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output.");
     if(flag & V4L2_CAP_RDS_CAPTURE) 
-        std::cout << "V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data." << std::endl;
+        LOG_INFO("V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data.");
     if(flag & V4L2_CAP_TUNER) 
-        std::cout << "V4L2_CAP_TUNER: It has a computer-controllable tuner." << std::endl;
+        LOG_INFO("V4L2_CAP_TUNER: It has a computer-controllable tuner.");
     if(flag & V4L2_CAP_AUDIO) 
-        std::cout << "V4L2_CAP_AUDIO: It can capture audio data." << std::endl;
+        LOG_INFO("V4L2_CAP_AUDIO: It can capture audio data.");
     if(flag & V4L2_CAP_RADIO) 
-        std::cout << "V4L2_CAP_RADIO: It is a radio device." << std::endl;
+        LOG_INFO("V4L2_CAP_RADIO: It is a radio device.");
     if(flag & V4L2_CAP_READWRITE) 
-        std::cout << "V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" <<
-                " very few devices will support both. It makes little sense to write " <<
-                "to a camera, normally." << std::endl;
+        LOG_INFO("V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" \
+                " very few devices will support both. It makes little sense to write " \
+                "to a camera, normally.");
     if(flag & V4L2_CAP_ASYNCIO) 
-        std::cout << "V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " <<
-                "the V4L2 layer as a whole does not yet support asynchronous I/O, " <<
-                "so this capability is not meaningful." << std::endl;
+        LOG_INFO("V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " \
+                "the V4L2 layer as a whole does not yet support asynchronous I/O, " \
+                "so this capability is not meaningful.");
     if(flag & V4L2_CAP_STREAMING) 
-        std::cout << "V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O." << std::endl;
+        LOG_INFO("V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O.");
 }
 
 std::string CamConfig::getCapabilityDriver() {
@@ -150,22 +145,24 @@ bool CamConfig::hasCapability(uint32_t capability_field) {
             valid = true;
         }
     }
-    if(!valid)
+    if(!valid) {
+        LOG_DEBUG("Capability flag %d not valid", capability_field);
         return false;
+    }
 
     return capability_field & mCapability.capabilities;
 }
 
 // CONTROL
 void CamConfig::readControl() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: readControl" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: readControl");
+
     struct v4l2_queryctrl queryctrl_tmp;
     memset (&queryctrl_tmp, 0, sizeof (struct v4l2_queryctrl));
     mCamCtrls.clear();
 
     // Checks which controls are offered by the camera / device-driver.
+    LOG_DEBUG("Check base control IDs");
     for (int i = V4L2_CID_BASE; 
             i < V4L2_CID_LASTP1;
             i++) {
@@ -174,6 +171,7 @@ void CamConfig::readControl() {
     }
 
     // Checks private controls of the e-CAM32_OMAP_GSTIX
+    LOG_DEBUG("Check private base control IDs");
     for (int i = V4L2_CID_PRIVATE_BASE + 1; 
             i < V4L2_CID_PRIVATE_BASE + 17;
             i++) {
@@ -182,19 +180,22 @@ void CamConfig::readControl() {
 }
 
 void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
+    LOG_DEBUG("CamConfig: readControl %d", queryctrl_tmp.id);
+
     // Store control id because it could be changed by the driver.
     unsigned int original_control_id = queryctrl_tmp.id;
 
     // Control-request successful?
     if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
         // Control available by the camera (continue if not)?
-        if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) { // PRINT INFO MESSAGE HERE
-            //std::cout << "control id " << queryctrl_tmp.id << " not available" << std::endl; 
+        if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) {
+            LOG_DEBUG("Control id %d marked as disabled", original_control_id);
             return;
         }
 
         // Driver seems not to like the control.
         if (queryctrl_tmp.id != original_control_id) {
+            LOG_DEBUG("Driver has changed the control ID %d, will not be used", original_control_id);
             return;
         }
 
@@ -232,7 +233,7 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(cam_ctrl.mCtrl.id, cam_ctrl));
     } else {
         if (errno == EINVAL) {
-            //std::cout << "control id " << queryctrl_tmp.id << " not available" << std::endl;
+            LOG_DEBUG("Control ID %d not available", original_control_id);
             return;
         }
         std::string err_str(strerror(errno));
@@ -241,6 +242,7 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
 }
 
 int32_t CamConfig::readControlValue(uint32_t const id) {
+    LOG_DEBUG("CamConfig: readControlValue %d", id);
     struct v4l2_control control;
     memset(&control, 0, sizeof(struct v4l2_control));
     control.id = id;
@@ -255,10 +257,12 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
         
         throw std::runtime_error(err_str.insert(0, "Could not read control object: ")); 
     }
+    LOG_DEBUG("Control ID %d value: %d", id, control.value);
     return control.value;
 }
 
 void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
+    LOG_DEBUG("CamConfig: writeControlValue");
     struct v4l2_control control;
     control.id = id;
     control.value = value;
@@ -266,7 +270,7 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
     // Problem setting control parameter V4L2_CID_WHITE_BALANCE_TEMPERATURE
     // on Microsoft LifeCam Cinema(TM), will be ignored.
     if(id == V4L2_CID_WHITE_BALANCE_TEMPERATURE) {
-        std::cerr << "Writing control V4L2_CID_WHITE_BALANCE_TEMPERATURE is ignored." << std::endl;
+        LOG_WARN("Writing of control V4L2_CID_WHITE_BALANCE_TEMPERATURE is ignored!");
         return;
     }
 
@@ -280,10 +284,14 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
     }
 
     // Check borders.
-    if(value < it->second.mCtrl.minimum)
+    if(value < it->second.mCtrl.minimum) {
+        LOG_INFO("Control %d value %d set to minimum %d", id, value, it->second.mCtrl.minimum);
         value = it->second.mCtrl.minimum;
-    if(value > it->second.mCtrl.maximum)
+    }
+    if(value > it->second.mCtrl.maximum) {
+        LOG_INFO("Control %d value %d set to maximum %d", id, value, it->second.mCtrl.maximum);
         value = it->second.mCtrl.maximum;
+    }
 
     if(0 == ioctl (mFd, VIDIOC_S_CTRL, &control)) {
         // Change internally stored value as well.
@@ -298,6 +306,7 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
         
         throw std::runtime_error(err_str.insert(0, "Could not read control object: ")); 
     }
+    LOG_DEBUG("Control value %d set to %d", id, value);
 }
 
 std::vector<uint32_t> CamConfig::getControlValidIDs() {
@@ -318,10 +327,8 @@ void CamConfig::listControls() {
         struct v4l2_queryctrl* pq = &(it->second.mCtrl);
         std::string name;
         getControlName(it->first, &name);
-        std::cout << pq->id << ": " << name << ", values: " << 
-            pq->minimum << " to " << pq->maximum << " (step " << pq->step << 
-            "), default: " << pq->default_value << 
-            ", current: " << it->second.mValue << std::endl;
+        LOG_INFO("%d: %s, values: %d to %d (step %d), default: %d, current: %d",
+            pq->id, name.c_str(), pq->minimum, pq->maximum, pq->default_value, it->second.mValue);
     }       
 }
 
@@ -333,8 +340,10 @@ bool CamConfig::getControlValue(uint32_t const id, int32_t* value) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no value is returned", id);
         return false;
+    }
 
     *value = it->second.mValue;
 
@@ -345,8 +354,10 @@ bool CamConfig::getControlType(uint32_t const id, enum v4l2_ctrl_type* type) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control type is returned", id);
         return false;
+    }
 
     *type = it->second.mCtrl.type;
 
@@ -357,8 +368,10 @@ bool CamConfig::getControlName(uint32_t const id, std::string* name) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control name is returned", id);
         return false;
+    }
 
     char buffer[32];
     snprintf(buffer, 32, "%s", it->second.mCtrl.name);
@@ -372,8 +385,10 @@ bool CamConfig::getControlMinimum(uint32_t const id, int32_t* minimum) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control minimum is returned", id);
         return false;
+    }
 
     *minimum = it->second.mCtrl.minimum;
 
@@ -384,8 +399,10 @@ bool CamConfig::getControlMaximum(uint32_t const id, int32_t* maximum) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control maximum is returned", id);
         return false;
+    }
 
     *maximum = it->second.mCtrl.maximum;
 
@@ -396,8 +413,10 @@ bool CamConfig::getControlStep(uint32_t const id, int32_t* step) {
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control step is returned", id);
         return false;
+    }
 
     *step = it->second.mCtrl.step;
 
@@ -408,8 +427,10 @@ bool CamConfig::getControlDefaultValue(uint32_t const id, int32_t* default_value
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control default value is returned", id);
         return false;
+    }
 
     *default_value = it->second.mCtrl.default_value;
 
@@ -421,8 +442,10 @@ bool CamConfig::getControlFlag(uint32_t const id, uint32_t const flag, bool* set
     it = mCamCtrls.find(id);
 
     // Valid id?
-    if(it == mCamCtrls.end())
+    if(it == mCamCtrls.end()) {
+        LOG_DEBUG("Control ID %d not found, no control flag is returned", id);
         return false;
+    }
 
     // Valid flag?
     bool valid_flag = false;
@@ -430,8 +453,10 @@ bool CamConfig::getControlFlag(uint32_t const id, uint32_t const flag, bool* set
         if(flag == f)
             valid_flag = true;
     }
-    if(!valid_flag)
+    if(!valid_flag) {
+        LOG_INFO("Control flag %d is not valid", flag);
         return false;
+    }
 
     *set = (it->second.mCtrl.flags & flag);
 
@@ -439,6 +464,7 @@ bool CamConfig::getControlFlag(uint32_t const id, uint32_t const flag, bool* set
 }
 
 void CamConfig::setControlValuesToDefault() {
+    LOG_DEBUG("Set control values to default");
     std::map<uint32_t, struct CamCtrl>::iterator it;
     for(it = mCamCtrls.begin(); it != mCamCtrls.end(); it++) {
         int32_t default_value;
@@ -449,9 +475,7 @@ void CamConfig::setControlValuesToDefault() {
 
 // IMAGE
 void CamConfig::readImageFormat() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: readImageFormat" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: readImageFormat");
     memset(&mFormat, 0, sizeof(struct v4l2_format));
 
     // struct v4l2_pix_format should be requested.
@@ -469,6 +493,8 @@ void CamConfig::readImageFormat() {
 
 void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const height, 
         uint32_t const pixelformat) {
+
+    LOG_DEBUG("CamConfig: writeImagePixelFormat");
 
     if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) { // not yet requested?
         readImageFormat();
@@ -495,13 +521,13 @@ void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const heigh
 void CamConfig::listImageFormat() {
     std::string pixelformat_str;
     getImagePixelformatString(&pixelformat_str);
-    std::cout << "Image width: " << mFormat.fmt.pix.width << std::endl;
-    std::cout << "Image height: " << mFormat.fmt.pix.height << std::endl;
-    std::cout << "Image pixelformat: " << pixelformat_str << std::endl;
-    std::cout << "Image field: " << mFormat.fmt.pix.field << std::endl;
-    std::cout << "Image bytesperline: " << mFormat.fmt.pix.bytesperline << std::endl;
-    std::cout << "Image sizeimage: " << mFormat.fmt.pix.sizeimage << std::endl;
-    std::cout << "Image colorspace: " << mFormat.fmt.pix.colorspace << std::endl;
+    LOG_INFO("Image width: %d", mFormat.fmt.pix.width);
+    LOG_INFO("Image height: %d", mFormat.fmt.pix.height);
+    LOG_INFO("Image pixelformat: %s", pixelformat_str.c_str());
+    LOG_INFO("Image field: %d", mFormat.fmt.pix.field);
+    LOG_INFO("Image bytesperline: %d", mFormat.fmt.pix.bytesperline);
+    LOG_INFO("Image sizeimage: %d", mFormat.fmt.pix.sizeimage);
+    LOG_INFO("Image colorspace: %d", mFormat.fmt.pix.colorspace);
 }
 
 bool CamConfig::getImageWidth(uint32_t* width) {
@@ -548,8 +574,10 @@ bool CamConfig::getImagePixelformatString(std::string* pixelformat_str) {
 }
 
 bool CamConfig::getImageField(enum v4l2_field* field) {
-    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
+    }
     
     *field = mFormat.fmt.pix.field;
 
@@ -557,8 +585,10 @@ bool CamConfig::getImageField(enum v4l2_field* field) {
 }
 
 bool CamConfig::getImageBytesperline(uint32_t* bytesperline) {
-    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
+    }
     
     *bytesperline = mFormat.fmt.pix.bytesperline;
 
@@ -566,8 +596,10 @@ bool CamConfig::getImageBytesperline(uint32_t* bytesperline) {
 }
 
 bool CamConfig::getImageSizeimage(uint32_t* sizeimage) {
-    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
+    }
     
     *sizeimage = mFormat.fmt.pix.sizeimage;
 
@@ -575,8 +607,10 @@ bool CamConfig::getImageSizeimage(uint32_t* sizeimage) {
 }
 
 bool CamConfig::getImageColorspace(enum v4l2_colorspace* colorspace) {
-    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+    if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
+    }
     
     *colorspace = mFormat.fmt.pix.colorspace;
 
@@ -585,9 +619,8 @@ bool CamConfig::getImageColorspace(enum v4l2_colorspace* colorspace) {
 
 // STREAMPARM
 void CamConfig::readStreamparm() {
-    #if PRINT_DEBUG
-    std::cout << "CamConfig: readStreamparm" << std::endl;
-    #endif
+    LOG_DEBUG("CamConfig: readStreamparm");
+
     memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
     mStreamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -604,7 +637,10 @@ void CamConfig::readStreamparm() {
 
 void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denominator) {
 
+    LOG_DEBUG("CamConfig: writeStreamparm");
+
     if(mStreamparm.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) { // not yet requested?
+        LOG_DEBUG("Streamparm not yet requested, read streamparm.");
         readStreamparm();
     }
 
@@ -614,9 +650,13 @@ void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denomin
 
     if(numerator != 0)
         mStreamparm.parm.capture.timeperframe.numerator = numerator;
+    else
+        LOG_DEBUG("numerator is 0");
 
     if(denominator != 0)
         mStreamparm.parm.capture.timeperframe.denominator = denominator;
+    else
+        LOG_DEBUG("denominator is 0");
 
     // Suggest the new stream parameters and fill mStreamparm with the actual one the driver choosed.
     if(0 != ioctl(mFd, VIDIOC_S_PARM, &mStreamparm)) {
@@ -630,27 +670,30 @@ void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denomin
 }
 
 void CamConfig::listStreamparm() {
-    std::cout << "Capabilities: " << std::endl;
+    LOG_INFO("Capabilities: ");
     uint32_t flag = mStreamparm.parm.capture.capability;
-    if(flag & V4L2_CAP_TIMEPERFRAME) 
-        std::cout << "V4L2_CAP_TIMEPERFRAME: The frame skipping/repeating " <<
-                "controlled by the timeperframe field is supported." << std::endl;
+    if(flag & V4L2_CAP_TIMEPERFRAME) {
+        LOG_INFO("V4L2_CAP_TIMEPERFRAME: The frame skipping/repeating " \
+                "controlled by the timeperframe field is supported.");
+    }
 
-    std::cout << "Capturemodes: " << std::endl;
+    LOG_INFO("Capturemodes: ");
     flag = mStreamparm.parm.capture.capturemode;
-        std::cout << "V4L2_MODE_HIGHQUALITY: High quality imaging mode." << std::endl;
-    std::cout << "Capturemode: " << mStreamparm.parm.capture.capturemode << std::endl;
+    if(flag & V4L2_MODE_HIGHQUALITY) {
+        LOG_INFO("V4L2_MODE_HIGHQUALITY: High quality imaging mode.");
+    }
+    LOG_INFO("Capturemode: %d", mStreamparm.parm.capture.capturemode);
 
-    std::cout << "Timeperframe: " << mStreamparm.parm.capture.timeperframe.numerator << 
-            "/" << mStreamparm.parm.capture.timeperframe.denominator << std::endl;
+    LOG_INFO("Timeperframe: %d/%d", mStreamparm.parm.capture.timeperframe.numerator,
+            mStreamparm.parm.capture.timeperframe.denominator);
 
     uint32_t extendedmode = mStreamparm.parm.capture.extendedmode;
     std::string ext_str = extendedmode == 0 ? " (unused)" : "";
-    std::cout << "Extendedmode: " << extendedmode << ext_str << std::endl;
+    LOG_INFO("Extendedmode: %d%s", extendedmode, ext_str.c_str());
 
     uint32_t readbuffers = mStreamparm.parm.capture.readbuffers;       
     std::string read_str = readbuffers == 0 ? " Should not be zero!" : "";
-    std::cout << "Readbuffers: " << mStreamparm.parm.capture.readbuffers << read_str << std::endl;
+    LOG_INFO("Readbuffers: %d%s", readbuffers, read_str.c_str());
 }
 
 bool CamConfig::readFPS(uint32_t* fps) {
@@ -659,6 +702,10 @@ bool CamConfig::readFPS(uint32_t* fps) {
     uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
     uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
     
+    if(n == 0) {
+        LOG_INFO("Numerator is 0, fps 0 is returned");
+    }
+
     *fps = n == 0 ? 0 : d/n;
     return true;
 }
@@ -667,7 +714,7 @@ void CamConfig::writeFPS(uint32_t fps) {
     try {
         writeStreamparm(1,fps);
     } catch (CamConfigException& err) {
-        std::cerr << err.what() << std::endl;
+        LOG_ERROR("writeFPS: %s", err.what());
     }
 }
 
@@ -675,6 +722,10 @@ bool CamConfig::getFPS(uint32_t* fps) {
     uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
     uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
     
+    if(n == 0) {
+        LOG_INFO("Numerator is 0, fps 0 is returned");
+    }
+
     *fps = n == 0 ? 0 : d/n;
     return true;
 }
@@ -688,8 +739,10 @@ bool CamConfig::hasCapabilityStreamparm(uint32_t capability_field) {
             valid = true;
         }
     }
-    if(!valid)
+    if(!valid) {
+        LOG_INFO("Passed flag not valid, false is returned");
         return false;
+    }
 
     return (capability_field & mStreamparm.parm.capture.capability);
 }
@@ -703,8 +756,10 @@ bool CamConfig::hasCapturemodeStreamparm(uint32_t capturemode) {
             valid = true;
         }
     }
-    if(!valid)
+    if(!valid) {
+        LOG_INFO("Passed flag not valid, false is returned");
         return false;
+    }
 
     return (capturemode & mStreamparm.parm.capture.capturemode);
 }
