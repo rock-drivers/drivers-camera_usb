@@ -170,6 +170,89 @@ void CamConfig::readControl() {
         readControl(queryctrl_tmp);
     }
 
+    // MPEG
+    LOG_DEBUG("Check MPEG base control IDs");
+    for (int i = V4L2_CID_MPEG_BASE+0; 
+            i < V4L2_CID_MPEG_BASE+8;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("Check MPEG audio base control IDs");
+    for (int i = V4L2_CID_MPEG_BASE+100; 
+            i < V4L2_CID_MPEG_BASE+112;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("Check MPEG video base control IDs");
+    for (int i = V4L2_CID_MPEG_BASE+200; 
+            i < V4L2_CID_MPEG_BASE+212;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("Check MPEG base control IDs specific to the CX2341x driver");
+    for (int i = V4L2_CID_MPEG_CX2341X_BASE+0; 
+            i < V4L2_CID_MPEG_CX2341X_BASE+12;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    // Camera class
+    LOG_DEBUG("Check camera class control IDs");
+    for (int i = V4L2_CID_CAMERA_CLASS_BASE+1; 
+            i < V4L2_CID_CAMERA_CLASS_BASE+17;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    // FM Modulator
+    LOG_DEBUG("FM Modulator class control IDs");
+    for (int i = V4L2_CID_FM_TX_CLASS_BASE + 1; 
+            i < V4L2_CID_FM_TX_CLASS_BASE + 7;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("FM Modulator class control IDs");
+    for (int i = V4L2_CID_FM_TX_CLASS_BASE + 64; 
+            i < V4L2_CID_FM_TX_CLASS_BASE + 67;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("FM Modulator class control IDs");
+    for (int i = V4L2_CID_FM_TX_CLASS_BASE + 80; 
+            i < V4L2_CID_FM_TX_CLASS_BASE + 85;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("FM Modulator class control IDs");
+    for (int i = V4L2_CID_FM_TX_CLASS_BASE + 96; 
+            i < V4L2_CID_FM_TX_CLASS_BASE + 99;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
+    LOG_DEBUG("FM Modulator class control IDs");
+    for (int i = V4L2_CID_FM_TX_CLASS_BASE + 112; 
+            i < V4L2_CID_FM_TX_CLASS_BASE + 115;
+            i++) {
+        queryctrl_tmp.id = i;
+        readControl(queryctrl_tmp);
+    }
+
     // Checks private controls of the e-CAM32_OMAP_GSTIX
     LOG_DEBUG("Check private base control IDs");
     for (int i = V4L2_CID_PRIVATE_BASE + 1; 
@@ -329,6 +412,12 @@ void CamConfig::listControls() {
         getControlName(it->first, &name);
         LOG_INFO("%d: %s, values: %d to %d (step %d), default: %d, current: %d",
             pq->id, name.c_str(), pq->minimum, pq->maximum, pq->default_value, it->second.mValue);
+        if(it->second.mMenuItems.size() > 0) {
+            LOG_INFO("Menu-Entries");
+        }
+        for(int i=0; i < it->second.mMenuItems.size(); i++) {
+            LOG_INFO("%d: %s", i, it->second.mMenuItems[i].c_str());
+        }
     }       
 }
 
