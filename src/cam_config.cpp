@@ -212,6 +212,7 @@ void CamConfig::readControl() {
         readControl(queryctrl_tmp);
     }
 
+    /*
     // FM Modulator
     LOG_DEBUG("FM Modulator class control IDs");
     for (int i = V4L2_CID_FM_TX_CLASS_BASE + 1; 
@@ -252,6 +253,7 @@ void CamConfig::readControl() {
         queryctrl_tmp.id = i;
         readControl(queryctrl_tmp);
     }
+    */
 
     // Checks private controls of the e-CAM32_OMAP_GSTIX
     LOG_DEBUG("Check private base control IDs");

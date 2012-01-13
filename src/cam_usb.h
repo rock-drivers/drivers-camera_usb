@@ -131,6 +131,8 @@ class CamUsb : public CamInterface {
 
     /**
      * Returns true if the attribute can be used with the camera.
+     * Excludes int_attrib::ExposureValue at the moment, because problems occurs using the
+     * Microsoft LiveCam.
      */
     virtual bool isAttribAvail(const int_attrib::CamAttrib attrib);
 

@@ -183,30 +183,11 @@ bool CamUsb::setAttrib(const int_attrib::CamAttrib attrib, const int value) {
     if(it == mMapAttrsCtrlsInt.end())
         throw std::runtime_error("Unknown attribute!");
     else {
-        // Checks stuff like "setting of exposure only possible if exposure mode ist set to manual".
-/*
-        int exposure_auto_value = 0;
-        switch(it->second) {
-                if(config.getControlValue(V4L2_CID_EXPOSURE_AUTO, &exposure_auto_value)) {
-                    if(exposure_auto_value == V4L2_EXPOSURE_MANUAL) {
-*/
-                        try {
-                            config.writeControlValue(it->second, value);
-                        } catch(std::runtime_error& e) {
-                            LOG_ERROR("Set exposure value to %d: %s", value, e.what());
-                        }
-/*
-                    } else {
-                        LOG_INFO("Exposure value not set, mode ist not 'manual'");
-                    }
-                }
-                break;
-
-            default: 
-                config.writeControlValue(it->second, value);
-                break;
-        }   
-*/
+        try {
+            config.writeControlValue(it->second, value);
+        } catch(std::runtime_error& e) {
+            LOG_ERROR("Set integer attribute %d to %d: %s", attrib, value, e.what());
+        }
     }
     return true;
 }
@@ -281,22 +262,6 @@ bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
             config.writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 2);
             break;
         }
-        case enum_attrib::ExposureModeToAuto: {
-            try {
-                config.writeControlValue(V4L2_CID_EXPOSURE_AUTO, 0);
-            } catch(std::runtime_error& e) {
-                LOG_ERROR("ExposureModeToAuto: %s", e.what());
-            }
-            break;
-        }
-        case enum_attrib::ExposureModeToManual: {
-            try {
-                config.writeControlValue(V4L2_CID_EXPOSURE_AUTO, 1);
-            } catch(std::runtime_error& e) {
-                LOG_ERROR("ExposureModeToManual: %s", e.what());
-            }
-            break;
-        }
         // attribute unknown or not supported (yet)
         default:
             throw std::runtime_error("Unknown attribute!");
@@ -307,6 +272,11 @@ bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
 
 bool CamUsb::isAttribAvail(const int_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribAvail int");
+
+    if(attrib == int_attrib::ExposureValue) {
+        LOG_WARN("The current driver version ignores the integer attribute ExposureValue.");
+        return false;
+    }
 
     if(mCamGst->isPipelineRunning()) {
         LOG_INFO("Stop image requesting before checking whether an int attribute is available.");
@@ -372,10 +342,6 @@ bool CamUsb::isAttribAvail(const enum_attrib::CamAttrib attrib) {
         case enum_attrib::PowerLineFrequencyTo50:
         case enum_attrib::PowerLineFrequencyTo60: {
             return config.isControlIdValid(V4L2_CID_POWER_LINE_FREQUENCY);
-        }
-        case enum_attrib::ExposureModeToManual:
-        case enum_attrib::ExposureModeToAuto: {
-            return  config.isControlIdValid(V4L2_CID_EXPOSURE_AUTO);
         }
         // attribute unknown or not supported (yet)
         default:
@@ -465,12 +431,6 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
         case enum_attrib::PowerLineFrequencyTo60:
              config.getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
             return value == 2;
-        case enum_attrib::ExposureModeToAuto:
-            config.getControlValue(V4L2_CID_EXPOSURE_AUTO, &value); 
-            return value == 0;
-        case enum_attrib::ExposureModeToManual:
-             config.getControlValue(V4L2_CID_EXPOSURE_AUTO, &value); 
-            return value == 1;
         // attribute unknown or not supported (yet)
         default:
             throw std::runtime_error("Unknown attribute!");
@@ -627,7 +587,6 @@ void CamUsb::createAttrsCtrlMaps() {
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::WhitebalValue,V4L2_CID_WHITE_BALANCE_TEMPERATURE));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::SharpnessValue,V4L2_CID_SHARPNESS));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::BacklightCompensation,V4L2_CID_BACKLIGHT_COMPENSATION));
-    mMapAttrsCtrlsInt.insert(ac_int(int_attrib::ExposureValue,V4L2_CID_EXPOSURE_ABSOLUTE));
 }
 
 } // end namespace camera
