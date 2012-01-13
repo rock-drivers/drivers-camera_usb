@@ -170,6 +170,28 @@ class CamUsb : public CamInterface {
     virtual bool isAttribSet(const enum_attrib::CamAttrib attrib);
 
     /**
+     * Can be used to check the availability of v4l2 control IDs directly.
+     * Throws a CamConfigException if a used command is not supported or
+     * std::runtime_exception if an read/write error occurred.
+     */
+    bool isV4L2AttribAvail(const int control_id);
+
+    /**
+     * Returns the value of the passed control id.
+     * If the pipeline is still running, 0 will be returned.
+     * Throws a CamConfigException if a used command is not supported or
+     * std::runtime_exception if an read/write error occurred.
+     */
+    int getV4L2Attrib(const int control_id);
+
+    /**
+     * Sets the v4l2 control id directly.
+     * Throws a CamConfigException if a used command is not supported or
+     * std::runtime_exception if an read/write error occurred.
+     */
+    bool setV4L2Attrib(const int control_id, const int value);
+
+    /**
      * If necessary 'size' will be changed to a valid one. 'mode' should be set to
      * base::samples::frame::MODE_JPEG and 'color_depth' to the bytes per pixel.
      */

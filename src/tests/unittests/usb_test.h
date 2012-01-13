@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(attribute_test) {
         BOOST_REQUIRE_THROW(usb.setAttrib(camera::enum_attrib::GainModeToManual), std::runtime_error);
     }
     std::cout << "Set attributes to default " << std::endl;
-    BOOST_REQUIRE_NO_THROW(usb.setToDefault());
+    //BOOST_REQUIRE_NO_THROW(usb.setToDefault());
 }
 
 BOOST_AUTO_TEST_CASE(other_test) {
@@ -138,6 +138,18 @@ BOOST_AUTO_TEST_CASE(other_test) {
     BOOST_REQUIRE_NO_THROW(usb.getRange(camera::int_attrib::BrightnessValue, min, max));
     std::cout << "Brightness Min: " << min << ", Max: " << max << std::endl; 
     BOOST_REQUIRE_THROW(usb.getFileDescriptor(),std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(work_with_v4l2_controls_directly) {
+    std::cout << "WORK WITH V4L2 DIRECTLY" << std::endl;
+    usb.close();
+
+    int control_id = V4L2_CID_BRIGHTNESS;
+    int value = 0;
+    BOOST_CHECK(usb.isV4L2AttribAvail(control_id) == true);
+    BOOST_CHECK((value = usb.getV4L2Attrib(control_id)) != 0);
+    std::cout << "Set control id " << control_id << " to " << value << std::endl;
+    BOOST_CHECK(usb.setV4L2Attrib(control_id,1) == true);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -310,10 +310,10 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         }
 
         // Read and store current value.
-        cam_ctrl.mValue = readControlValue(queryctrl_tmp.id);
+        cam_ctrl.mValue = readControlValue(original_control_id);
 
         // Store CamCtrl using control ID as key.
-        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(cam_ctrl.mCtrl.id, cam_ctrl));
+        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
     } else {
         if (errno == EINVAL) {
             LOG_DEBUG("Control ID %d not available", original_control_id);
@@ -345,7 +345,7 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
 }
 
 void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
-    LOG_DEBUG("CamConfig: writeControlValue");
+    LOG_DEBUG("CamConfig: writeControlValue %d to %d", id, value);
     struct v4l2_control control;
     control.id = id;
     control.value = value;
@@ -369,11 +369,11 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
     // Check borders.
     if(value < it->second.mCtrl.minimum) {
         LOG_INFO("Control %d value %d set to minimum %d", id, value, it->second.mCtrl.minimum);
-        value = it->second.mCtrl.minimum;
+        control.value = it->second.mCtrl.minimum;
     }
     if(value > it->second.mCtrl.maximum) {
         LOG_INFO("Control %d value %d set to maximum %d", id, value, it->second.mCtrl.maximum);
-        value = it->second.mCtrl.maximum;
+        control.value = it->second.mCtrl.maximum;
     }
 
     if(0 == ioctl (mFd, VIDIOC_S_CTRL, &control)) {
@@ -387,7 +387,7 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
             throw CamConfigException(err_str.insert(0, 
                     "VIDIOC_S_CTRL is not supported by device driver: "));
         
-        throw std::runtime_error(err_str.insert(0, "Could not read control object: ")); 
+        throw std::runtime_error(err_str.insert(0, "Could not write control object: ")); 
     }
     LOG_DEBUG("Control value %d set to %d", id, value);
 }
@@ -411,7 +411,7 @@ void CamConfig::listControls() {
         std::string name;
         getControlName(it->first, &name);
         LOG_INFO("%d: %s, values: %d to %d (step %d), default: %d, current: %d",
-            pq->id, name.c_str(), pq->minimum, pq->maximum, pq->default_value, it->second.mValue);
+            pq->id, name.c_str(), pq->minimum, pq->maximum, pq->step, pq->default_value, it->second.mValue);
         if(it->second.mMenuItems.size() > 0) {
             LOG_INFO("Menu-Entries");
         }
