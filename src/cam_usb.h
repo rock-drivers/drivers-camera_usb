@@ -27,6 +27,12 @@
 namespace camera 
 {
 
+    enum CAM_USB_MODE {
+        CAM_USB_NONE,
+        CAM_USB_V4L2,
+        CAM_USB_GST
+    };
+
 /**
  * Uses CamConfig to set and get all releveant camera parameters.
  * The GStreamer component starts a thread internally requesting images from the
@@ -262,6 +268,10 @@ class CamUsb : public CamInterface {
 
     virtual int getFileDescriptor() const;
 
+    inline enum CAM_USB_MODE getCamMode() {
+        return mCamMode;
+    }
+
  private:
     CamUsb(){};
 
@@ -275,7 +285,18 @@ class CamUsb : public CamInterface {
             return mReceivedFrameCounter / sec;
     }
 
+    enum CAM_USB_MODE mCamMode;
+
+    /**
+     * Because the configuration and the image transfer part
+     * have to share one device, only one component can be active at once.
+     * The other non-active component will be deleted.
+     * \param cam_usb_mode CAM_USB_NONE deletes both components.
+     */
+    void changeCameraMode(enum CAM_USB_MODE cam_usb_mode);
+
     CamGst* mCamGst;
+    CamConfig* mCamConfig;
     std::string mDevice;
 
     // Pipeline has been created and is running. No further configuration possible.

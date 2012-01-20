@@ -3,7 +3,7 @@
 namespace camera 
 {
 
-CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), 
+CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL)
         mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0), 
         mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
@@ -587,6 +587,41 @@ void CamUsb::createAttrsCtrlMaps() {
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::WhitebalValue,V4L2_CID_WHITE_BALANCE_TEMPERATURE));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::SharpnessValue,V4L2_CID_SHARPNESS));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::BacklightCompensation,V4L2_CID_BACKLIGHT_COMPENSATION));
+}
+
+void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
+    if(cam_usb_mode == mCamMode) {
+        LOG_INFO("cam-mode %d already set, nothing changed.",cam_usb_mode);
+        return;
+    }
+
+    if(mCamGst != NULL) {
+        delete mCamGst;
+        mCamGSt = NULL;
+    }
+    if(mCamConfig != NULL)
+        delete mCamConfig;
+        mCamConfig = NULL;
+    }
+
+    switch (cam_usb_mode) {
+        case CAM_USB_NONE:
+            mCamMode = CAM_USB_NONE;
+            break;
+        case CAM_USB_V4L2:
+            mCamConfig = new CamConfig(mDevice);
+            mCamMode = CAM_USB_V4L2;
+            break;
+        case CAM_USB_GST:
+            mCamGst = new CamGst(device);
+            mCamMode = CAM_USB_GST;
+            break;
+        default:
+            LOG_WARN("Unknown cam-mode %d passed, modus will be set to CAM_USB_NONE");
+            mCamMode = CAM_USB_NONE;
+            break;
+        }
+    }
 }
 
 } // end namespace camera
