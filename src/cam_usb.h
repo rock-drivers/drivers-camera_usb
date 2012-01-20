@@ -65,9 +65,8 @@ class CamUsb : public CamInterface {
     virtual int listCameras(std::vector<CamInfo> &cam_infos)const;
 
     /**
-     * Kind of initialization, creates pipeline and stores the passed
-     * CamInfo structure.
-     * \return Sets mIsOpen to true and returns true if the pipeline could be started.
+     * Stores the passed CamInfo structure and opens camera for configuration via v4l2.
+     * \return Always true.
      */
     virtual bool open(const CamInfo &cam,const AccessMode mode=Master);
 
@@ -79,8 +78,9 @@ class CamUsb : public CamInterface {
     virtual const CamInfo *getCameraInfo()const;
 
     /**
-     * Deletes and stops pipeline / image requesting.
-     * \return false if the pipeline is not open.
+     * Close camera, sets camera mode to CAM_USB_NONE (configuration or image requesting
+     * is not possible anymore).
+     * \return Always true.
      */
     virtual bool close();
 

@@ -146,9 +146,9 @@ class CamGst {
     CamGst();
 
     /**
-     * Use CamConfig to find and set valid camera parameters
-     * (driver will choose most suitable).
      * Each parameter which is 0 will get the last stored value of the camera.
+     * \warning Use CamConfig to find and set valid camera parameters
+     * (driver will choose most suitable). Can this lead to a blocked device?
      */
     void setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps,
             uint32_t* fpeg_quality);

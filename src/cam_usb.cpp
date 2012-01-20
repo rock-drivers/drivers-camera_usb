@@ -3,26 +3,26 @@
 namespace camera 
 {
 
-CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL)
+CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL),
         mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0), 
         mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
     LOG_DEBUG("CamUsb: constructor");
-    mCamGst = new CamGst(device);
     mDevice = device;
     createAttrsCtrlMaps();
+    changeCameraMode(CAM_USB_V4L2);
 }
 
 CamUsb::~CamUsb() {
     LOG_DEBUG("CamUsb: destructor");
-    delete mCamGst;
+    changeCameraMode(CAM_USB_NONE);
 }
 
 int CamUsb::listCameras(std::vector<CamInfo> &cam_infos)const {
     LOG_DEBUG("CamUsb: listCameras");
     // Pipeline must not be running, because CamInfo is used.
-    if(mCamGst->isPipelineRunning()) {
-        LOG_INFO("Cameras can not be listed, because pipeline is running");
+    if(mCamMode != CAM_USB_V4L2) {
+        LOG_INFO("Cameras can not be listed, current camera mode is %d", mCamMode);
         return 0;
     }
 
@@ -32,15 +32,13 @@ int CamUsb::listCameras(std::vector<CamInfo> &cam_infos)const {
             return 0;
         }
     }
-    
-    CamConfig config(mDevice);
 
     struct CamInfo cam_info;
 
     cam_info.unique_id = CAM_ID;
     cam_info.device = mDevice;
     cam_info.interface_type = InterfaceUSB;
-    cam_info.display_name = config.getCapabilityCard();
+    cam_info.display_name = mCamConfig->getCapabilityCard();
     cam_info.reachable = false;
     
     cam_infos.push_back(cam_info);
@@ -56,10 +54,10 @@ bool CamUsb::open(const CamInfo &cam,const AccessMode mode) {
         return true;
     }
 
+    changeCameraMode(CAM_USB_V4L2);
+
     mCamInfo = cam; // Assign camera (not allowed in listCameras()).
 
-    // If one of the parameters is 0, the current setting of the camera is used.
-    mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, (uint32_t)mFps);
     mIsOpen = true;
 
     // Will be started in grab().
@@ -84,8 +82,8 @@ bool CamUsb::close() {
     LOG_DEBUG("CamUsb: close");
 
     if(mIsOpen) {
-        mCamGst->deletePipeline();
         mIsOpen = false;
+        changeCameraMode(CAM_USB_NONE);
     } else {
         LOG_INFO("Camera already closed");
     }
@@ -107,11 +105,14 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
 
     switch(mode) {
         case Stop:
-            mCamGst->stopPipeline();
+            changeCameraMode(CAM_USB_V4L2);
             break;
         case SingleFrame:
         case MultiFrame:
         case Continuously: {
+            changeCameraMode(CAM_USB_GST);
+             // If one of the parameters is 0, the current setting of the camera is used.
+            mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, (uint32_t)mFps);
             bool pipeline_started = false;
             pipeline_started = mCamGst->startPipeline();
             mReceivedFrameCounter = 0;
@@ -130,8 +131,13 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
 bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout) {
     LOG_DEBUG("CamUsb: retrieveFrame");
 
-    if(!mIsOpen || !mCamGst->isPipelineRunning()) {
-        LOG_WARN("Frame can not be retrieved, because pipeline is not open or not running.");
+    if(mCamMode != CAM_USB_GST) {
+        LOG_INFO("Frame can not be retrieved, current camera mode is %d", mCamMode);
+        return false;
+    }
+
+    if(!mCamGst->isPipelineRunning()) {
+        LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
         return false;
     }
     uint8_t* buffer = NULL;
@@ -155,11 +161,23 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
 
 bool CamUsb::isFrameAvailable() {
     LOG_DEBUG("CamUsb: isFrameAvailable");
+
+    if(mCamMode != CAM_USB_GST) {
+        LOG_INFO("Cant check whether a frame is available, current camera mode is %d", mCamMode);
+        return false;
+    }
+
     return mCamGst->hasNewBuffer();
 }
 
 int CamUsb::skipFrames() {
     LOG_DEBUG("CamUsb: skipFrames");
+
+    if(mCamMode != CAM_USB_GST) {
+        LOG_INFO("Frame can not be skipped, current camera mode is %d", mCamMode);
+        return false;
+    }
+
     return mCamGst->skipBuffer() ? 1 : 0;
 }
 
@@ -172,19 +190,17 @@ bool CamUsb::setIpSettings(const CamInfo &cam, const IPSettings &ip_settings)con
 bool CamUsb::setAttrib(const int_attrib::CamAttrib attrib, const int value) {
     LOG_DEBUG("CamUsb: setAttrib int");
     
-    if(mCamGst->isPipelineRunning()) {
-        LOG_INFO("Stop image requesting before setting an int attribute.");
+    if(mCamMode != CAM_USB_V4L2) {
+        LOG_INFO("An int attribute can not be set, current mode is %d",mCamMode);
         return false;
     }
-
-    CamConfig config(mDevice);
 
     std::map<int_attrib::CamAttrib, int>::iterator it = mMapAttrsCtrlsInt.find(attrib);
     if(it == mMapAttrsCtrlsInt.end())
         throw std::runtime_error("Unknown attribute!");
     else {
         try {
-            config.writeControlValue(it->second, value);
+            mCamConfig->writeControlValue(it->second, value);
         } catch(std::runtime_error& e) {
             LOG_ERROR("Set integer attribute %d to %d: %s", attrib, value, e.what());
         }
@@ -196,18 +212,16 @@ bool CamUsb::setAttrib(const int_attrib::CamAttrib attrib, const int value) {
 bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value) {
     LOG_DEBUG("CamUsb: seAttrib double");
    
-    if(mCamGst->isPipelineRunning()) {
-        LOG_INFO("Stop image requesting before setting a double attribute.");
+    if(mCamMode != CAM_USB_V4L2) {
+        LOG_INFO("A double attribute. can not be set, current mode is %d",mCamMode);
         return false;
     }
-
-    CamConfig config(mDevice);
 
     switch(attrib) {
 
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            config.writeFPS((uint32_t)value);
+            mCamConfig->writeFPS((uint32_t)value);
             mFps = value;
             break;
         }
@@ -226,40 +240,38 @@ bool setAttrib(const str_attrib::CamAttrib attrib,const std::string value) {
 bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: setAttrib enum");
 
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before setting an enum attribute.");
         return false;
     }
 
-    CamConfig config(mDevice);
-
     switch(attrib) {
         case enum_attrib::WhitebalModeToManual: {
-            config.writeControlValue(V4L2_CID_AUTO_WHITE_BALANCE, 0);
+            mCamConfig->writeControlValue(V4L2_CID_AUTO_WHITE_BALANCE, 0);
             break;
         }
         case enum_attrib::WhitebalModeToAuto: {
-            config.writeControlValue(V4L2_CID_AUTO_WHITE_BALANCE, 1);
+            mCamConfig->writeControlValue(V4L2_CID_AUTO_WHITE_BALANCE, 1);
             break;
         }
         case enum_attrib::GainModeToManual: {
-            config.writeControlValue(V4L2_CID_AUTOGAIN, 0);
+            mCamConfig->writeControlValue(V4L2_CID_AUTOGAIN, 0);
             break;
         }
         case enum_attrib::GainModeToAuto: {
-            config.writeControlValue(V4L2_CID_AUTOGAIN, 1);
+            mCamConfig->writeControlValue(V4L2_CID_AUTOGAIN, 1);
             break;
         }
         case enum_attrib::PowerLineFrequencyDisabled: {
-            config.writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 0);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 0);
             break;
         }
         case enum_attrib::PowerLineFrequencyTo50: {
-            config.writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 1);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 1);
             break;
         }
         case enum_attrib::PowerLineFrequencyTo60: {
-            config.writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 2);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 2);
             break;
         }
         // attribute unknown or not supported (yet)
@@ -278,24 +290,22 @@ bool CamUsb::isAttribAvail(const int_attrib::CamAttrib attrib) {
         return false;
     }
 
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before checking whether an int attribute is available.");
         return false;
     }
-
-    CamConfig config(mDevice);
 
     std::map<int_attrib::CamAttrib, int>::iterator it = mMapAttrsCtrlsInt.find(attrib);
     if(it == mMapAttrsCtrlsInt.end())
         return false;
     else
-        return config.isControlIdValid(it->second);
+        return mCamConfig->isControlIdValid(it->second);
 }
 
 bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribAvail double");
     
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         // mFps will only be set if the double attribute FrameRate or StatFrameRate is available.
         if((attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) && mFps != 0) { 
             return true;
@@ -305,13 +315,11 @@ bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
         }
     }
 
-    CamConfig config(mDevice);
-
     switch(attrib) {
 
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            return config.hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME);
+            return mCamConfig->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME);
         }
         default:
             return false;
@@ -322,26 +330,24 @@ bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
 bool CamUsb::isAttribAvail(const enum_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb:isAttriAvail enum");
     
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before checking whether an enum attribute is available.");
         return false;
     }
 
-    CamConfig config(mDevice);
-
     switch(attrib) {
         case enum_attrib::WhitebalModeToManual:
         case enum_attrib::WhitebalModeToAuto: {
-            return config.isControlIdValid(V4L2_CID_AUTO_WHITE_BALANCE);
+            return mCamConfig->isControlIdValid(V4L2_CID_AUTO_WHITE_BALANCE);
         }
         case enum_attrib::GainModeToManual:
         case enum_attrib::GainModeToAuto: {
-            return config.isControlIdValid(V4L2_CID_AUTOGAIN);
+            return mCamConfig->isControlIdValid(V4L2_CID_AUTOGAIN);
         }
         case enum_attrib::PowerLineFrequencyDisabled:
         case enum_attrib::PowerLineFrequencyTo50:
         case enum_attrib::PowerLineFrequencyTo60: {
-            return config.isControlIdValid(V4L2_CID_POWER_LINE_FREQUENCY);
+            return mCamConfig->isControlIdValid(V4L2_CID_POWER_LINE_FREQUENCY);
         }
         // attribute unknown or not supported (yet)
         default:
@@ -353,19 +359,17 @@ bool CamUsb::isAttribAvail(const enum_attrib::CamAttrib attrib) {
 int CamUsb::getAttrib(const int_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: getAttrib int");
 
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before getting an int attribute.");
         return 0;
     }
-
-    CamConfig config(mDevice);
 
     std::map<int_attrib::CamAttrib, int>::iterator it = mMapAttrsCtrlsInt.find(attrib);
     if(it == mMapAttrsCtrlsInt.end())
         throw std::runtime_error("Unknown attribute!");
 
     int32_t value = 0;
-    config.getControlValue(it->second, &value);    
+    mCamConfig->getControlValue(it->second, &value);    
 
     return value; 
 }
@@ -373,7 +377,7 @@ int CamUsb::getAttrib(const int_attrib::CamAttrib attrib) {
 double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: getAttrib double");
 
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         // If FrameRate or StatFrameRate is requested, the current fps are returned if the pipeline is running,
         // otherwise the fps which is set on the camera. 
         if(attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) {
@@ -383,13 +387,11 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
         return 0.0;
     }
 
-    CamConfig config(mDevice);
-
     switch(attrib) {
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
             uint32_t fps;
-            config.readFPS(&fps);
+            mCamConfig->readFPS(&fps);
             mFps = (double)fps;
             return mFps;
         }
@@ -401,35 +403,33 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
 bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribSet enum");
    
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before check whether a enum attribute is set.");
         return false;
     }
 
-    CamConfig config(mDevice);
-
     int32_t value = 0;
     switch(attrib) {
         case enum_attrib::WhitebalModeToManual: 
-            config.getControlValue(V4L2_CID_AUTO_WHITE_BALANCE, &value);
+            mCamConfig->getControlValue(V4L2_CID_AUTO_WHITE_BALANCE, &value);
             return value == 0;
         case enum_attrib::WhitebalModeToAuto:
-            config.getControlValue(V4L2_CID_AUTO_WHITE_BALANCE, &value);
+            mCamConfig->getControlValue(V4L2_CID_AUTO_WHITE_BALANCE, &value);
             return value == 1;
         case enum_attrib::GainModeToManual:
-            config.getControlValue(V4L2_CID_AUTOGAIN, &value);
+            mCamConfig->getControlValue(V4L2_CID_AUTOGAIN, &value);
             return value == 0;
         case enum_attrib::GainModeToAuto:
-            config.getControlValue(V4L2_CID_AUTOGAIN, &value);
+            mCamConfig->getControlValue(V4L2_CID_AUTOGAIN, &value);
             return value == 1;
         case enum_attrib::PowerLineFrequencyDisabled:
-            config.getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
+            mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
             return value == 0;
         case enum_attrib::PowerLineFrequencyTo50:
-            config.getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
+            mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
             return value == 1;
         case enum_attrib::PowerLineFrequencyTo60:
-             config.getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
+             mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
             return value == 2;
         // attribute unknown or not supported (yet)
         default:
@@ -440,27 +440,25 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
 bool CamUsb::isV4L2AttribAvail(const int control_id) {
     LOG_DEBUG("CamUsb: isV4L2AttribAvail");
    
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before check whether a v4l2 control attribute is available.");
         return false;
     }
 
-    CamConfig config(mDevice);
-    return config.isControlIdValid(control_id);
+    return mCamConfig->isControlIdValid(control_id);
 }
 
 int CamUsb::getV4L2Attrib(const int control_id) {
     LOG_DEBUG("CamUsb: isAttribSet enum");
    
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before getting a v4l2 attribute.");
         return 0;
     }
 
-    CamConfig config(mDevice);
     int value = 0;
 
-    if(!config.getControlValue(control_id, &value))
+    if(!mCamConfig->getControlValue(control_id, &value))
         throw std::runtime_error("Unknown control id!");
     else
         return value;
@@ -469,17 +467,16 @@ int CamUsb::getV4L2Attrib(const int control_id) {
 bool CamUsb::setV4L2Attrib(const int control_id, const int value) {
     LOG_DEBUG("CamUsb: isAttribSet enum");
    
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before setting a v4l2 attribute.");
         return false;
     }
 
-    CamConfig config(mDevice);
-    if(!config.isControlIdValid(control_id)) {
+    if(!mCamConfig->isControlIdValid(control_id)) {
         return false;
     }
     
-    config.writeControlValue(control_id, value);
+    mCamConfig->writeControlValue(control_id, value);
     return true;
 }
 
@@ -490,7 +487,7 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
 
     LOG_DEBUG("CamUsb: setFrameSettings");
     
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop the device before setting frame settings.");
         return false;
     }
@@ -500,11 +497,10 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
     
     LOG_DEBUG("color_depth is set to %d", (int)color_depth);
 
-    CamConfig config(mDevice);
-    config.writeImagePixelFormat(size.width, size.height); // use V4L2_PIX_FMT_YUV420?
+    mCamConfig->writeImagePixelFormat(size.width, size.height); // use V4L2_PIX_FMT_YUV420?
     uint32_t width = 0, height = 0;
-    config.getImageWidth(&width);
-    config.getImageHeight(&height);
+    mCamConfig->getImageWidth(&width);
+    mCamConfig->getImageHeight(&height);
 
     base::samples::frame::frame_size_t size_tmp;
     size_tmp.width = (uint16_t)width;
@@ -536,33 +532,29 @@ bool CamUsb::triggerFrame() {
 bool CamUsb::setToDefault() {
     LOG_DEBUG("CamUsb: setToDefault");
     
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before set camera parameters to default.");
         return false;
     }
 
-    CamConfig config(mDevice);
-
-    config.setControlValuesToDefault();
+    mCamConfig->setControlValuesToDefault();
     return true;
 }
 
 void CamUsb::getRange(const int_attrib::CamAttrib attrib,int &imin,int &imax) {
     LOG_DEBUG("CamUsb: getRange");
     
-    if(mCamGst->isPipelineRunning()) {
+    if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before requesting range.");
         return;
     }
 
-    CamConfig config(mDevice);
-
     std::map<int_attrib::CamAttrib, int>::iterator it = mMapAttrsCtrlsInt.find(attrib);
     if(it != mMapAttrsCtrlsInt.end()) {
         int32_t min = 0, max = 0;
-        config.getControlMinimum(it->second, &min);
+        mCamConfig->getControlMinimum(it->second, &min);
         imin = min;
-        config.getControlMaximum(it->second, &max);
+        mCamConfig->getControlMaximum(it->second, &max);
         imax = max;
     }
 }
@@ -591,36 +583,38 @@ void CamUsb::createAttrsCtrlMaps() {
 
 void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
     if(cam_usb_mode == mCamMode) {
-        LOG_INFO("cam-mode %d already set, nothing changed.",cam_usb_mode);
+        LOG_DEBUG("cam-mode %d already set, nothing changed.",cam_usb_mode);
         return;
     }
 
     if(mCamGst != NULL) {
         delete mCamGst;
-        mCamGSt = NULL;
+        mCamGst = NULL;
     }
-    if(mCamConfig != NULL)
+    if(mCamConfig != NULL) {
         delete mCamConfig;
         mCamConfig = NULL;
     }
 
     switch (cam_usb_mode) {
         case CAM_USB_NONE:
+            LOG_INFO("Camera configuration mode set to none");
             mCamMode = CAM_USB_NONE;
             break;
         case CAM_USB_V4L2:
+            LOG_INFO("Camera configuration mode via v4l2 activated");
             mCamConfig = new CamConfig(mDevice);
             mCamMode = CAM_USB_V4L2;
             break;
         case CAM_USB_GST:
-            mCamGst = new CamGst(device);
+            LOG_INFO("Camera image transfer mode via gst activated");
+            mCamGst = new CamGst(mDevice);
             mCamMode = CAM_USB_GST;
             break;
         default:
             LOG_WARN("Unknown cam-mode %d passed, modus will be set to CAM_USB_NONE");
             mCamMode = CAM_USB_NONE;
             break;
-        }
     }
 }
 
