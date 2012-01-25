@@ -332,7 +332,7 @@ BOOST_AUTO_TEST_CASE(control_test)
     
     std::vector<uint32_t> ids = cam_config->getControlValidIDs();
     uint32_t unknown_id = 1;    
-    uint32_t unknown_flag = 0x0003;
+    //uint32_t unknown_flag = 0x0003;
     uint32_t known_flag = V4L2_CTRL_FLAG_READ_ONLY;
 
     enum v4l2_ctrl_type type;
