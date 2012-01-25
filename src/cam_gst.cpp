@@ -387,6 +387,9 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
     mBuffer = gst_app_sink_pull_buffer((GstAppSink*)object);
     mBufferSize = GST_BUFFER_SIZE(mBuffer);
     mNewBuffer = true;
+    LOG_DEBUG("New image received, size: %d",mBufferSize); 
+    //std::string name("cam_usb_test.jpg");
+    //cam_gst_p->storeImageToFile(GST_BUFFER_DATA(mBuffer), mBufferSize, name);
     pthread_mutex_unlock(&mMutexBuffer);
 }   
 } // end namespace camera
