@@ -167,16 +167,28 @@ void CamConfig::readControl() {
             i < V4L2_CID_LASTP1;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_BASE control parameter %d: %s", 
+                    i-V4L2_CID_BASE, e.what());
+        }
     }
 
     // MPEG
     LOG_DEBUG("Check MPEG base control IDs");
-    for (int i = V4L2_CID_MPEG_BASE+0; 
+    for (int i = V4L2_CID_MPEG_BASE; 
             i < V4L2_CID_MPEG_BASE+8;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+                    i-V4L2_CID_MPEG_BASE, e.what());
+        }
     }
 
     LOG_DEBUG("Check MPEG audio base control IDs");
@@ -184,7 +196,13 @@ void CamConfig::readControl() {
             i < V4L2_CID_MPEG_BASE+112;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+                    i-V4L2_CID_MPEG_BASE, e.what());
+        }
     }
 
     LOG_DEBUG("Check MPEG video base control IDs");
@@ -192,7 +210,13 @@ void CamConfig::readControl() {
             i < V4L2_CID_MPEG_BASE+212;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+                    i-V4L2_CID_MPEG_BASE, e.what());
+        }
     }
 
     LOG_DEBUG("Check MPEG base control IDs specific to the CX2341x driver");
@@ -200,7 +224,13 @@ void CamConfig::readControl() {
             i < V4L2_CID_MPEG_CX2341X_BASE+12;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_MPEG_CX2341X_BASE control parameter %d: %s", 
+                    i-V4L2_CID_MPEG_CX2341X_BASE, e.what());
+        }
     }
 
     // Camera class
@@ -209,9 +239,14 @@ void CamConfig::readControl() {
             i < V4L2_CID_CAMERA_CLASS_BASE+17;
             i++) {
         queryctrl_tmp.id = i;
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_CAMERA_CLASS_BASE control parameter %d: %s", 
+                    i-V4L2_CID_CAMERA_CLASS_BASE, e.what());
+        }
     }
-
     /*
     // FM Modulator
     LOG_DEBUG("FM Modulator class control IDs");
@@ -260,7 +295,13 @@ void CamConfig::readControl() {
     for (int i = V4L2_CID_PRIVATE_BASE + 1; 
             i < V4L2_CID_PRIVATE_BASE + 17;
             i++) {
-        readControl(queryctrl_tmp);
+        try {
+            readControl(queryctrl_tmp);
+        }
+        catch (std::runtime_error& e) {
+            LOG_ERROR("Reading V4L2_CID_PRIVATE_BASE control parameter %d: %s", 
+                    i-V4L2_CID_PRIVATE_BASE, e.what());
+        }
     }
 }
 
