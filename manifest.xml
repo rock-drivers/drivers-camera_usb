@@ -7,5 +7,6 @@
   <url>http://</url>
   <logo>http://</logo>
   <depend package="drivers/camera_interface" />
+  <depend package="gstreamer" />
   <!-- <depend package="external/gst_dsp_arm" /> -->
 </package>

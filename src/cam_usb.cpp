@@ -306,7 +306,6 @@ bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribAvail double");
     
     if(mCamMode != CAM_USB_V4L2) {
-        // mFps will only be set if the double attribute FrameRate or StatFrameRate is available.
         if(attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) { 
             return true;
         } else {
