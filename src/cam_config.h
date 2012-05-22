@@ -63,7 +63,8 @@ class CamConfig
      */
     struct CamCtrl {
      public:
-        CamCtrl() : mCtrl(), mMenuItems(), mValue(0) {
+        CamCtrl() : mCtrl(), mMenuItems(), mValue(0), 
+                mWriteOnly(false), mReadOnly(false) {
             memset(&mCtrl, 0, sizeof(struct v4l2_queryctrl));
         }        
         
@@ -73,6 +74,8 @@ class CamConfig
         struct v4l2_queryctrl mCtrl;
         std::vector<std::string> mMenuItems;
         int32_t mValue;
+        bool mWriteOnly; // Above values are set to zero.
+        bool mReadOnly;
     }; 
 
  public: // CAMCONFIG

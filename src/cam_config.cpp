@@ -295,6 +295,7 @@ void CamConfig::readControl() {
     for (int i = V4L2_CID_PRIVATE_BASE + 1; 
             i < V4L2_CID_PRIVATE_BASE + 17;
             i++) {
+        queryctrl_tmp.id = i;
         try {
             readControl(queryctrl_tmp);
         }
@@ -329,9 +330,17 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         CamCtrl cam_ctrl;
         cam_ctrl.mCtrl = queryctrl_tmp;
 
+        // Read-only control?
+        // Flags V4L2_CTRL_FLAG_GRABBED, V4L2_CTRL_FLAG_UPDATE, V4L2_CTRL_FLAG_INACTIVE
+        // and V4L2_CTRL_FLAG_SLIDER are ignored at the moment.
+        if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_READ_ONLY) {
+            LOG_DEBUG("Control id %d marked as read-only", original_control_id);
+            cam_ctrl.mReadOnly = true;
+            return;
+        }
+
         // Read menue entries if available.
         if (queryctrl_tmp.type == V4L2_CTRL_TYPE_MENU) {
-            
             struct v4l2_querymenu querymenu_tmp;
             memset (&querymenu_tmp, 0, sizeof (struct v4l2_querymenu));
             querymenu_tmp.id = queryctrl_tmp.id;
@@ -358,12 +367,15 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         // Store CamCtrl using control ID as key.
         mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
     } else {
-        if (errno == EINVAL) {
-            LOG_DEBUG("Control ID %d not available", original_control_id);
+        // Unknown control, will be ignored.
+        if (errno == EINVAL) { 
+            LOG_DEBUG("Control ID %d not available and will be ignored", original_control_id);
             return;
         }
-        std::string err_str(strerror(errno));
-        throw std::runtime_error(err_str.insert(0, "Could not read control object: "));
+        // Control seems to be known and will be added as write-only.
+        CamCtrl cam_ctrl;
+        cam_ctrl.mWriteOnly = true;
+        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
     }
 }
 
@@ -374,14 +386,8 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
     control.id = id;
    
     if (0 != ioctl (mFd, VIDIOC_G_CTRL, &control)) {
-        std::string err_str(strerror(errno));
-        
-        // ID unknown?
-        if(errno == EINVAL)
-            throw CamConfigException(err_str.insert(0, 
-                    "VIDIOC_G_CTRL is not supported by device driver: ")); ;
-        
-        throw std::runtime_error(err_str.insert(0, "Could not read control object: ")); 
+        std::string err_str(strerror(errno)); 
+        throw std::runtime_error(err_str.insert(0, "Could not read control object value: ")); 
     }
     LOG_DEBUG("Control ID %d value: %d", id, control.value);
     return control.value;
@@ -453,12 +459,13 @@ void CamConfig::listControls() {
         struct v4l2_queryctrl* pq = &(it->second.mCtrl);
         std::string name;
         getControlName(it->first, &name);
-        LOG_INFO("%d: %s, values: %d to %d (step %d), default: %d, current: %d",
-            pq->id, name.c_str(), pq->minimum, pq->maximum, pq->step, pq->default_value, it->second.mValue);
+        LOG_INFO("\n\t0x%x(%d): %s, values: %d to %d (step %d), default: %d, current: %d, write-only: %s, read-only: %s\n", 
+            pq->id, pq->id, name.c_str(), pq->minimum, pq->maximum, pq->step, pq->default_value, it->second.mValue,
+            it->second.mWriteOnly ? "true" : "false", it->second.mReadOnly ? "true" : "false");
         if(it->second.mMenuItems.size() > 0) {
             LOG_INFO("Menu-Entries");
         }
-        for(int i=0; i < it->second.mMenuItems.size(); i++) {
+        for(unsigned int i=0; i < it->second.mMenuItems.size(); i++) {
             LOG_INFO("%d: %s", i, it->second.mMenuItems[i].c_str());
         }
     }       
