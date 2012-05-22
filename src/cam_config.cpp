@@ -362,7 +362,12 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         }
 
         // Read and store current value.
-        cam_ctrl.mValue = readControlValue(original_control_id);
+        try {
+            cam_ctrl.mValue = readControlValue(original_control_id);
+        } catch(std::runtime_error& e) {
+            // Assuming write-only control (id valid, only read operation should work)
+            cam_ctrl.mWriteOnly = true;
+        }
 
         // Store CamCtrl using control ID as key.
         mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
@@ -372,15 +377,14 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
             LOG_DEBUG("Control ID %d not available and will be ignored", original_control_id);
             return;
         }
-        // Control seems to be known and will be added as write-only.
-        CamCtrl cam_ctrl;
-        cam_ctrl.mWriteOnly = true;
-        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
+        std::string err_str(strerror(errno)); 
+        throw std::runtime_error(err_str.insert(0, "Could not query control: ")); 
     }
 }
 
 int32_t CamConfig::readControlValue(uint32_t const id) {
     LOG_DEBUG("CamConfig: readControlValue %d", id);
+
     struct v4l2_control control;
     memset(&control, 0, sizeof(struct v4l2_control));
     control.id = id;
@@ -412,7 +416,12 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
 
     // id unknown?
     if(it == mCamCtrls.end()) {
-        throw std::runtime_error("Passed id unknown.");
+        throw std::runtime_error("Passed id unknown");
+    }
+
+    // read-only control?
+    if(it->second.mReadOnly) {
+        throw std::runtime_error("Control with the passed id is read-only");
     }
 
     // Check borders.
