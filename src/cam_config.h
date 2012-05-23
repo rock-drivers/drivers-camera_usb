@@ -25,6 +25,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// e-CAM32 v4l2 controls
+#include "omap_v4l2.h"
+
 #include <errno.h>
 #include <string.h>
 
