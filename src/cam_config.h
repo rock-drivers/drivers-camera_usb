@@ -153,6 +153,11 @@ class CamConfig
      */
     std::vector<uint32_t> getControlValidIDs();
 
+    /**
+     * Returns a copy of all available controls.
+     */
+    std::vector<struct CamConfig::CamCtrl> getControlList();
+
     void listControls();
 
     /**

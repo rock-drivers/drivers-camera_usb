@@ -461,6 +461,17 @@ std::vector<uint32_t> CamConfig::getControlValidIDs() {
     return ids;
 }
 
+std::vector<struct CamConfig::CamCtrl> CamConfig::getControlList() {
+    std::map<uint32_t, struct CamConfig::CamCtrl>::iterator it;
+
+    std::vector<struct CamConfig::CamCtrl> controls;
+    for(it = mCamCtrls.begin(); it != mCamCtrls.end(); it++) {
+        controls.push_back(it->second);
+    }
+    
+    return controls;
+}
+
 void CamConfig::listControls() {
     std::map<uint32_t, struct CamCtrl>::iterator it;
 
