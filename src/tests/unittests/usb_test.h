@@ -28,30 +28,28 @@ BOOST_AUTO_TEST_CASE(init_test) {
     
     BOOST_CHECK(usb.isOpen() == false);
     BOOST_CHECK(usb.getCameraInfo() == NULL);
-    usb.close();
 
-    std::cout << "Open camera" << std::endl;
-    BOOST_REQUIRE_NO_THROW(usb.open(cam_infos[0]));
-    BOOST_CHECK(usb.isOpen() == true);
+    BOOST_CHECK(usb.open(cam_infos[0]) == true); // Allows configuration.
     BOOST_CHECK(usb.getCameraInfo() != NULL);
 
-    usb.close();
+    std::cout << "Change frame settings to 640,480,MODE_JPEG, 3" << std::endl;
+    base::samples::frame::frame_size_t size(640,480);
+    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
 }
 
 BOOST_AUTO_TEST_CASE(buffer_test) {
     std::cout << "BUFFER TESTS" << std::endl;
-    std::cout << "Close camera and change frame settings to 640,640,MODE_JPEG, 3" << std::endl;
-    usb.close();
-    base::samples::frame::frame_size_t size(640,640);
-    BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
 
-    BOOST_CHECK(usb.grab() == false);
-    BOOST_CHECK(usb.isFrameAvailable() == false);
-
-    std::cout << "Open and start grabbing" << std::endl;
-    BOOST_CHECK(usb.open(cam_infos[0]) == true);
-    BOOST_CHECK(usb.grab(camera::Continuously) == true);
+    std::cout << "Start grabbing 1" << std::endl;
+    BOOST_CHECK(usb.grab(camera::SingleFrame) == true);
+    BOOST_REQUIRE_THROW(usb.grab(camera::Continuously), std::runtime_error); // Stop grabbing before switching the mode.
+    std::cout << "Stop grabbing" << std::endl;
+    BOOST_CHECK(usb.grab(camera::Stop) == true); // Stops pipeline again.
+    std::cout << "Start grabbing 2" << std::endl;
+    BOOST_CHECK(usb.grab(camera::SingleFrame) == true); // And reopens pipeline again.
     sleep(1);
+
+    BOOST_CHECK(usb.getFileDescriptor() != -1);
     std::cout << "Get image and check size and mode" << std::endl;
     BOOST_CHECK(usb.isFrameAvailable() == true);
     base::samples::frame::Frame frame;
@@ -59,14 +57,15 @@ BOOST_AUTO_TEST_CASE(buffer_test) {
     BOOST_CHECK(frame.getWidth() == 640);
     BOOST_CHECK(frame.getHeight() == 480);
     BOOST_CHECK(frame.getFrameMode() == base::samples::frame::MODE_JPEG);
-    usb.close();
     
+    std::cout << "Stop grabbing" << std::endl;
+    BOOST_CHECK(usb.grab(camera::Stop) == true); // Stops pipeline again.
     std::cout << "Change size to 1280, 720 and request 100 images" << std::endl;
+    base::samples::frame::frame_size_t size(1280,760);
     size.width = 1280;
     size.height = 720;
     BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
     BOOST_CHECK(usb.retrieveFrame(frame,1000) == false);
-    BOOST_CHECK(usb.open(cam_infos[0]) == true);
     BOOST_CHECK(usb.grab(camera::Continuously) == true);
     sleep(1);
     for(int i=0; i<100; i++)
@@ -85,19 +84,20 @@ BOOST_AUTO_TEST_CASE(buffer_test) {
 
 BOOST_AUTO_TEST_CASE(attribute_test) {
     std::cout << "ATTRIBUTE TESTS" << std::endl;
+
+    std::cout << "Stop pipeline and switch back to configuration mode" << std::endl;
+    BOOST_CHECK(usb.grab(camera::Stop) == true);
+
     std::cout << "Set INT attributes" << std::endl;
     int val = 0;
     bool available = false;
-    usb.close();
     // INTs
-    BOOST_CHECK((available = usb.isAttribAvail(camera::int_attrib::BrightnessValue)) == true);
-    if(available) {
+    if(usb.isAttribAvail(camera::int_attrib::BrightnessValue)) {
         BOOST_REQUIRE_NO_THROW(val = usb.getAttrib(camera::int_attrib::BrightnessValue));
         std::cout << "BrightnessValue: " << val << std::endl;
         BOOST_REQUIRE_NO_THROW(usb.setAttrib(camera::int_attrib::BrightnessValue, val));
     }
-    BOOST_CHECK((available = usb.isAttribAvail(camera::int_attrib::IrisAutoTarget)) == false);
-    if(!available) {
+    if(usb.isAttribAvail(camera::int_attrib::IrisAutoTarget)) {
         BOOST_REQUIRE_THROW(val = usb.getAttrib(camera::int_attrib::IrisAutoTarget), std::runtime_error);
         BOOST_REQUIRE_THROW(usb.setAttrib(camera::int_attrib::IrisAutoTarget, val), std::runtime_error);
     }
@@ -118,12 +118,10 @@ BOOST_AUTO_TEST_CASE(attribute_test) {
 
     std::cout << "Set ENUM attributes" << std::endl;
     // ENUMs
-    BOOST_CHECK((available = usb.isAttribAvail(camera::enum_attrib::WhitebalModeToAuto)) == true);
-    if(available) {
+    if(usb.isAttribAvail(camera::enum_attrib::WhitebalModeToAuto)) {
         BOOST_REQUIRE_NO_THROW(usb.setAttrib(camera::enum_attrib::WhitebalModeToAuto));
     }
-    BOOST_CHECK((available = usb.isAttribAvail(camera::enum_attrib::GainModeToManual)) == false);
-    if(!available) {
+    if(usb.isAttribAvail(camera::enum_attrib::GainModeToManual)) {
         BOOST_REQUIRE_THROW(usb.setAttrib(camera::enum_attrib::GainModeToManual), std::runtime_error);
     }
     std::cout << "Set attributes to default " << std::endl;
@@ -133,23 +131,23 @@ BOOST_AUTO_TEST_CASE(attribute_test) {
 BOOST_AUTO_TEST_CASE(other_test) {
     std::cout << "OTHER TESTS" << std::endl;
     std::cout << "Get range" << std::endl; 
-    usb.close();
     int min=0, max=0;
     BOOST_REQUIRE_NO_THROW(usb.getRange(camera::int_attrib::BrightnessValue, min, max));
     std::cout << "Brightness Min: " << min << ", Max: " << max << std::endl; 
-    BOOST_REQUIRE_THROW(usb.getFileDescriptor(),std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(work_with_v4l2_controls_directly) {
     std::cout << "WORK WITH V4L2 DIRECTLY" << std::endl;
-    usb.close();
 
     int control_id = V4L2_CID_BRIGHTNESS;
     int value = 0;
-    BOOST_CHECK(usb.isV4L2AttribAvail(control_id) == true);
-    BOOST_CHECK((value = usb.getV4L2Attrib(control_id)) != 0);
-    std::cout << "Set control id " << control_id << " to " << value << std::endl;
-    BOOST_CHECK(usb.setV4L2Attrib(control_id,1) == true);
+
+    if(usb.isV4L2AttribAvail(control_id)) {
+        BOOST_CHECK((value = usb.getV4L2Attrib(control_id)));
+
+        std::cout << "Set control id " << control_id << " to " << value << std::endl;
+        BOOST_CHECK(usb.setV4L2Attrib(control_id,value));
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

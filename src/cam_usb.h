@@ -42,12 +42,18 @@ namespace camera
  * device is closed / the pipeline is deleted.\n
  * To get an image you have to do:\n
  * 1. CamUsb constructor passing the device.
- * 2. setFrameSettings to define the size, mode and data_depth of the image.
+ * 2. listCameras to get a list of available cameras.
+ * 3. open one of the available cameras (here always the first and only one), allows configuration.
+ * 4. setFrameSettings to define the size, mode and data_depth of the image.
  *    optional: set attributes like brightness etc.
- * 3. listCameras to get a list of available cameras.
- * 4. open one of the available cameras (here always the first and only one).
- * 5. call grab to start requesting images / the GStreamer pipeline. 
+ * 5. call grab to start requesting images -> startes the GStreamer pipeline. 
  * 6. retrieveFrame to get a Frame.
+ *
+ * General informations for get-, set- and isAvailable Attribute:
+ * isAvailable will not throw an exception, get and set will throw runtime_error if 
+ * we are not in the configuration mode, the attribute is unknown or an error occurred.
+ * Attention: isAvailable can return false if the camera is not in configuration mode and if 
+ * the attribute is not available.
  */
 class CamUsb : public CamInterface {
 
@@ -61,6 +67,8 @@ class CamUsb : public CamInterface {
     
     /**
      * Adds the single cam_info structure to the passed vector.
+     * The cam_info.display_name will be added later, as soon as 
+     * the connection to the camera has been opened.
      */
     virtual int listCameras(std::vector<CamInfo> &cam_infos)const;
 
@@ -75,7 +83,7 @@ class CamUsb : public CamInterface {
     /**
      * \return NULL if camera is not open.
      */
-    virtual const CamInfo *getCameraInfo()const;
+    virtual const CamInfo* getCameraInfo()const;
 
     /**
      * Close camera, sets camera mode to CAM_USB_NONE (configuration or image requesting
@@ -163,7 +171,7 @@ class CamUsb : public CamInterface {
     virtual int getAttrib(const int_attrib::CamAttrib attrib);
 
     /**
-     * Returns the fps of the camera.
+     * Returns the fps of the camera or throws a std::runtime_error.
      */
     virtual double getAttrib(const double_attrib::CamAttrib attrib);
 
@@ -173,29 +181,33 @@ class CamUsb : public CamInterface {
     }
 
     /**
-     * Returns true if the enumeration attribute is set.
+     * Returns true if the enumeration attribute is set or throws a std::runtime_error.
      */
     virtual bool isAttribSet(const enum_attrib::CamAttrib attrib);
 
     /**
      * Can be used to check the availability of v4l2 control IDs directly.
-     * Throws a CamConfigException if a used command is not supported or
-     * std::runtime_exception if an read/write error occurred.
+     * \param control_id id of the control to check.
+     * \return false if the camera is not in configuration mode or the attribute is not available.
      */
     bool isV4L2AttribAvail(const int control_id);
 
     /**
-     * Returns the value of the passed control id.
-     * If the pipeline is still running, 0 will be returned.
-     * Throws a CamConfigException if a used command is not supported or
-     * std::runtime_exception if an read/write error occurred.
+     * Allows to request the last read control value
+     * (the value will not be re-read from the camera).
+     * \throws std::runtime_error
+     * \param control_id Control id to request.
+     * \return false if the camera is not in configuration mode or the passed id is unknown.
      */
     int getV4L2Attrib(const int control_id);
 
     /**
      * Sets the v4l2 control id directly.
-     * Throws a CamConfigException if a used command is not supported or
-     * std::runtime_exception if an read/write error occurred.
+     * \param control_id Control id to set the value for.
+     * \param value Value to set.
+     * \throws std::runtime_error if the configuration mode is not active, the passed id is unknown
+     * or writeControlValue() throws an exception.
+     * \return true if the value could be set.
      */
     bool setV4L2Attrib(const int control_id, const int value);
 
@@ -266,6 +278,10 @@ class CamUsb : public CamInterface {
 
     virtual void getRange(const int_attrib::CamAttrib attrib,int &imin,int &imax);
 
+    /**
+     * The pipeline must be running.
+     * \return -1 if an error occurred.
+     */
     virtual int getFileDescriptor() const;
 
     inline enum CAM_USB_MODE getCamMode() {

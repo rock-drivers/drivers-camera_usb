@@ -10,7 +10,7 @@ CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamC
     LOG_DEBUG("CamUsb: constructor");
     mDevice = device;
     createAttrsCtrlMaps();
-    changeCameraMode(CAM_USB_V4L2);
+    changeCameraMode(CAM_USB_NONE);
 }
 
 CamUsb::~CamUsb() {
@@ -20,11 +20,6 @@ CamUsb::~CamUsb() {
 
 int CamUsb::listCameras(std::vector<CamInfo> &cam_infos)const {
     LOG_DEBUG("CamUsb: listCameras");
-    // Pipeline must not be running, because CamInfo is used.
-    if(mCamMode != CAM_USB_V4L2) {
-        LOG_INFO("Cameras can not be listed, current camera mode is %d", mCamMode);
-        return 0;
-    }
 
     for(uint32_t i=0; i<cam_infos.size(); ++i) {
         if(cam_infos[i].unique_id == CAM_ID) {
@@ -38,7 +33,6 @@ int CamUsb::listCameras(std::vector<CamInfo> &cam_infos)const {
     cam_info.unique_id = CAM_ID;
     cam_info.device = mDevice;
     cam_info.interface_type = InterfaceUSB;
-    cam_info.display_name = mCamConfig->getCapabilityCard();
     cam_info.reachable = false;
     
     cam_infos.push_back(cam_info);
@@ -55,8 +49,11 @@ bool CamUsb::open(const CamInfo &cam,const AccessMode mode) {
     }
 
     changeCameraMode(CAM_USB_V4L2);
-
-    mCamInfo = cam; // Assign camera (not allowed in listCameras()).
+    
+    mCamInfo = cam; // Assign camera (not allowed in listCameras() as well).
+    if(mCamConfig != NULL) {
+        mCamInfo.display_name = mCamConfig->getCapabilityCard(); // Add name, not possible in listCameras().
+    }
 
     mIsOpen = true;
 
@@ -94,7 +91,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
     LOG_DEBUG("CamUsb: grab");
    
     //check if someone tries to change the grab mode during grabbing
-    if(act_grab_mode_!= Stop && mode != Stop) {
+    if(act_grab_mode_ != Stop && mode != Stop) {
         if(act_grab_mode_ != mode)
             throw std::runtime_error("Stop grabbing before switching the grab mode!");
         else {
@@ -106,6 +103,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
     switch(mode) {
         case Stop:
             changeCameraMode(CAM_USB_V4L2);
+            act_grab_mode_ = mode;
             break;
         case SingleFrame:
         case MultiFrame:
@@ -119,6 +117,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
             if(pipeline_started) {
                 gettimeofday(&mStartTimeGrabbing, 0);
             }
+            act_grab_mode_ = mode;
             return pipeline_started;
         }
         default: 
@@ -359,8 +358,7 @@ int CamUsb::getAttrib(const int_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: getAttrib int");
 
     if(mCamMode != CAM_USB_V4L2) {
-        LOG_INFO("Stop image requesting before getting an int attribute.");
-        return 0;
+        throw std::runtime_error("Stop image requesting before getting an int attribute.");
     }
 
     std::map<int_attrib::CamAttrib, int>::iterator it = mMapAttrsCtrlsInt.find(attrib);
@@ -382,8 +380,7 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
         if(attrib == double_attrib::FrameRate || attrib == double_attrib::StatFrameRate) {
             return calculateFPS();
         }
-        LOG_INFO("Stop image requesting before getting a double attribute.");
-        return 0.0;
+        throw std::runtime_error("Stop image requesting before getting a double attribute.");
     }
 
     switch(attrib) {
@@ -403,7 +400,7 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribSet enum");
    
     if(mCamMode != CAM_USB_V4L2) {
-        LOG_INFO("Stop image requesting before check whether a enum attribute is set.");
+        throw std::runtime_error("Stop image requesting before check whether a enum attribute is set.");
         return false;
     }
 
@@ -432,7 +429,7 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
             return value == 2;
         // attribute unknown or not supported (yet)
         default:
-            throw std::runtime_error("Unknown attribute!");
+            throw std::runtime_error("Unknown attribute");
     }
 }
 
@@ -444,37 +441,32 @@ bool CamUsb::isV4L2AttribAvail(const int control_id) {
         return false;
     }
 
-    return mCamConfig->isControlIdValid(control_id);
+    return(mCamConfig->isControlIdValid(control_id));
 }
 
 int CamUsb::getV4L2Attrib(const int control_id) {
-    LOG_DEBUG("CamUsb: isAttribSet enum");
+    LOG_DEBUG("CamUsb: getV4L2Attrib");
    
     if(mCamMode != CAM_USB_V4L2) {
-        LOG_INFO("Stop image requesting before getting a v4l2 attribute.");
-        return 0;
+        throw std::runtime_error("Stop image requesting before getting a v4l2 attribute.");
     }
 
-    int value = 0;
+    int value_tmp = 0;
 
-    if(!mCamConfig->getControlValue(control_id, &value))
-        throw std::runtime_error("Unknown control id!");
-    else
-        return value;
+    if(!mCamConfig->getControlValue(control_id, &value_tmp)) {
+         throw std::runtime_error("Unkown attribute");
+    }
+
+    return value_tmp;
 }
 
 bool CamUsb::setV4L2Attrib(const int control_id, const int value) {
-    LOG_DEBUG("CamUsb: isAttribSet enum");
+    LOG_DEBUG("CamUsb: setV4L2Attrib");
    
     if(mCamMode != CAM_USB_V4L2) {
-        LOG_INFO("Stop image requesting before setting a v4l2 attribute.");
-        return false;
+        throw std::runtime_error("Stop image requesting before setting a v4l2 attribute.");
     }
-
-    if(!mCamConfig->isControlIdValid(control_id)) {
-        return false;
-    }
-    
+ 
     mCamConfig->writeControlValue(control_id, value);
     return true;
 }
@@ -560,10 +552,15 @@ void CamUsb::getRange(const int_attrib::CamAttrib attrib,int &imin,int &imax) {
 
 int CamUsb::getFileDescriptor() const {
     LOG_DEBUG("CamUsb: getFileDescriptor");
+
+    if(mCamMode != CAM_USB_GST) {
+        LOG_INFO("Start pipeline to request the corresponding file descriptor");
+        return -1;
+    }
    
     int fd = mCamGst->getFileDescriptor();
     if(fd == -1) {
-        throw std::runtime_error("File descriptor could not be requested. Images must be requested (use grab()");
+        LOG_INFO("File descriptor could not be requested, start pipeline with grab() first");
     }
     return fd;
 }

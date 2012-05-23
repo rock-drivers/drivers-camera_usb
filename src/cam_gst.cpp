@@ -64,21 +64,21 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
         throw CamGstException("Default pipeline could not be created.");    
     }
 
-    // Add elements to pipeline.
-    gst_bin_add_many (GST_BIN (mPipeline), source, cap, encoder, sink, (void*)NULL);
-
-    // Link elements.
-    if (!gst_element_link_many (source, cap, encoder, sink, (void*)NULL)) {
-	    throw CamGstException("Failed to link default pipeline!");
-    }
-
     // Add a message handler.
     if(mGstPipelineBus != NULL) {
         gst_object_unref (mGstPipelineBus); 
         mGstPipelineBus = NULL;
     }
     mGstPipelineBus = gst_pipeline_get_bus (GST_PIPELINE (mPipeline));
-    gst_bus_add_watch (mGstPipelineBus, callbackMessages, this);   
+    gst_bus_add_watch (mGstPipelineBus, callbackMessages, this);  
+
+    // Add elements to pipeline.
+    gst_bin_add_many (GST_BIN (mPipeline), source, cap, encoder, sink, (void*)NULL);
+
+    // Link elements.
+    if (!gst_element_link_many (source, cap, encoder, sink, (void*)NULL)) {
+	    throw CamGstException("Failed to link default pipeline!");
+    } 
 }
 
 void CamGst::deletePipeline() {
@@ -90,9 +90,13 @@ void CamGst::deletePipeline() {
     
     stopPipeline();
 
+    gst_object_unref(GST_OBJECT(mGstPipelineBus)); 
+    mGstPipelineBus = NULL;
+
     gst_object_unref(GST_OBJECT(mPipeline));
     mPipeline = NULL;
     mPipelineRunning = false;
+
     mNewBuffer = false;
 }
 

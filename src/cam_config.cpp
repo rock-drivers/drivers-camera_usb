@@ -393,7 +393,7 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
         std::string err_str(strerror(errno)); 
         throw std::runtime_error(err_str.insert(0, "Could not read control object value: ")); 
     }
-    LOG_DEBUG("Control ID %d value: %d", id, control.value);
+    LOG_DEBUG("Control ID 0x%x(%d) value: %d", id, id, control.value);
     return control.value;
 }
 
@@ -447,7 +447,7 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
         
         throw std::runtime_error(err_str.insert(0, "Could not write control object: ")); 
     }
-    LOG_DEBUG("Control value %d set to %d", id, value);
+    LOG_DEBUG("Control value 0x%x(%d) set to %d", id, id, value);
 }
 
 std::vector<uint32_t> CamConfig::getControlValidIDs() {

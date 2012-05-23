@@ -2,9 +2,9 @@
 #include <boost/test/included/unit_test.hpp>
 
 // Always use only one test suite, otherwise the device will become blocked.
-#include "v4l2_test.h"
+//#include "v4l2_test.h"
 //#include "gst_test.h"
-//#include "usb_test.h"
+#include "usb_test.h"
 
 // You can use the following setups: 
 // BOOST_CHECK_MESSAGE(1 == 1, "Send test sucessfully");
