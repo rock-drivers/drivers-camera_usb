@@ -57,6 +57,23 @@ CamGst::~CamGst() {
     mMainLoopThread = NULL;
 }
 
+void CamGst::printElementFactories() {
+
+    g_print("ELEMENT FACTORIES BEGIN ###################################################################\n");
+    GList* elements = gst_registry_get_feature_list (gst_registry_get_default(), GST_TYPE_ELEMENT_FACTORY);
+    for(;elements != NULL; elements = elements->next)
+    {
+        GstElementFactory* factory = GST_ELEMENT_FACTORY(elements->data);
+        g_print ("The '%s' element is a member of the category %s.\n"
+           "Description: %s\n",
+           gst_plugin_feature_get_name (GST_PLUGIN_FEATURE (factory)),
+           gst_element_factory_get_klass (factory),
+           gst_element_factory_get_description (factory));
+
+    }
+    g_print("ELEMENT FACTORIES END ###################################################################\n");
+}
+
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
         uint32_t jpeg_quality) {
     LOG_DEBUG("CamGst: createDefaultPipeline");

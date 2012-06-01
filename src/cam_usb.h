@@ -33,6 +33,7 @@ namespace camera
         CAM_USB_GST
     };
 
+    static const std::string ModeTxt[] = { "CAM_USB_NONE", "CAM_USB_V4L2", "CAM_USB_GST" };
 /**
  * Uses CamConfig to set and get all releveant camera parameters.
  * The GStreamer component starts a thread internally requesting images from the

@@ -578,19 +578,20 @@ void CamUsb::createAttrsCtrlMaps() {
 }
 
 void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
+
+    LOG_DEBUG("Changing camera mode to: %s", camera::ModeTxt[cam_usb_mode].c_str());
+
     if(cam_usb_mode == mCamMode) {
         LOG_DEBUG("cam-mode %d already set, nothing changed.",cam_usb_mode);
         return;
     }
 
-    if(mCamGst != NULL) {
-        delete mCamGst;
-        mCamGst = NULL;
-    }
-    if(mCamConfig != NULL) {
-        delete mCamConfig;
-        mCamConfig = NULL;
-    }
+    delete mCamGst;
+    mCamGst = NULL;
+
+    delete mCamConfig;
+    mCamConfig = NULL;
+    
 
     switch (cam_usb_mode) {
         case CAM_USB_NONE:

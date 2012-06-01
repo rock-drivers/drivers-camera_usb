@@ -184,6 +184,11 @@ class CamGst {
 
     static void callbackNewBuffer(GstElement* object, CamGst* cam_gst_p); 
 
+    /**
+     * Print element factories for debugging purposes
+     */
+    void printElementFactories();
+
  private:
     std::string mDevice;
     uint32_t mJpegQuality;
