@@ -199,6 +199,17 @@ class CamGst {
 
     GstElement* mSource; // Used to request the fd.
     int mFileDescriptor; // File descriptor of the pipeline source. -1 if not available.
+
+    /**
+     * Using GstGuard to making sure that GStreamer is initialized/deinitialized only once, i.e. use
+     * static InitGuard gInit;
+     */
+    class InitGuard {
+    public:
+        InitGuard();
+        ~InitGuard();
+    };
+
 };
 
 } // end namespace camera

@@ -8,6 +8,17 @@ bool camera::CamGst::mNewBuffer = false;
 namespace camera 
 {
 
+
+CamGst::InitGuard::InitGuard() {
+            LOG_INFO("Initializing GStreamer");
+            gst_init(NULL, NULL);
+}
+
+CamGst::InitGuard::~InitGuard() {
+    LOG_INFO("Deinitializing GStreamer");
+    gst_deinit();
+}
+
 // PUBLIC
 CamGst::CamGst(std::string const& device) : mDevice(device), 
         mJpegQuality(DEFAULT_JPEG_QUALITY), 
@@ -19,9 +30,10 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mSource(NULL),
         mFileDescriptor(-1) {
     LOG_DEBUG("CamGst: constructor");
-    // gst_is_initialiszed() not available (since 0.10.31), 
+    // gst_is_initialized() not available (since 0.10.31), 
     // could lead to a gst-mini-unref-warning.
-    gst_init(NULL, NULL);
+    static InitGuard gInit;
+
     mLoop = g_main_loop_new (NULL, FALSE);
     pthread_mutex_init(&mMutexBuffer, NULL);
     LOG_DEBUG("Starting gst main loop thread");
@@ -43,7 +55,6 @@ CamGst::~CamGst() {
     pthread_join(*mMainLoopThread, NULL);
     delete mMainLoopThread;
     mMainLoopThread = NULL;
-    gst_deinit ();
 }
 
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
