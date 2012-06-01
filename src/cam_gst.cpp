@@ -45,6 +45,7 @@ CamGst::~CamGst() {
     LOG_DEBUG("CamGst: destructor");
     if(mBuffer != NULL) {
         gst_buffer_unref(mBuffer);
+        mBuffer = NULL;
         mBufferSize = 0; 
     }
     deletePipeline();
@@ -414,6 +415,7 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
     if(mBuffer != NULL) {
         LOG_DEBUG("Unref old image buffer");
         gst_buffer_unref(mBuffer);
+        mBuffer = NULL;
         mBufferSize = 0; 
     }
     mBuffer = gst_app_sink_pull_buffer((GstAppSink*)object);
