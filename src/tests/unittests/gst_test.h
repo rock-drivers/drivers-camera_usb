@@ -26,9 +26,9 @@ extern "C" {
 
 BOOST_AUTO_TEST_SUITE(gst_test_suite)
 
-camera::CamGst gst("/dev/video0");
 
 BOOST_AUTO_TEST_CASE(default_pipeline_test) {
+    camera::CamGst gst("/dev/video0");
     BOOST_CHECK(gst.startPipeline() == false);
     std::cout << "Create pipeline 640,480,20" << std::endl;
     BOOST_REQUIRE_NO_THROW(gst.createDefaultPipeline(640, 480, 20));
@@ -48,6 +48,7 @@ BOOST_AUTO_TEST_CASE(default_pipeline_test) {
 }
 
 BOOST_AUTO_TEST_CASE(request_image_test) {
+    camera::CamGst gst("/dev/video0");
     uint32_t buf_size = 0;
     uint8_t* buffer = NULL;
     try {

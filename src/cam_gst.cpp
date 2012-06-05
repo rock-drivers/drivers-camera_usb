@@ -1,9 +1,11 @@
 #include "cam_gst.h"
 
+/*
 GstBuffer* camera::CamGst::mBuffer = NULL;
 uint32_t camera::CamGst::mBufferSize = 0;
 pthread_mutex_t camera::CamGst::mMutexBuffer;
 bool camera::CamGst::mNewBuffer = false;
+*/
 
 namespace camera 
 {
@@ -99,7 +101,7 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
         mGstPipelineBus = NULL;
     }
     mGstPipelineBus = gst_pipeline_get_bus (GST_PIPELINE (mPipeline));
-    gst_bus_add_watch (mGstPipelineBus, callbackMessages, this);  
+    gst_bus_add_watch (mGstPipelineBus, callbackMessagesStatic, this);  
 
     // Add elements to pipeline.
     gst_bin_add_many (GST_BIN (mPipeline), source, cap, encoder, sink, (void*)NULL);
@@ -349,7 +351,7 @@ GstElement* CamGst::createDefaultSink() {
 	gst_app_sink_set_emit_signals ((GstAppSink*) element, TRUE);
 
     // do after add und link? Disconnecting?
-	g_signal_connect (element, "new-buffer",  G_CALLBACK (callbackNewBuffer), this);
+	g_signal_connect (element, "new-buffer",  G_CALLBACK (callbackNewBufferStatic), this);
     return element;
 }
 
@@ -371,7 +373,7 @@ bool CamGst::readFileDescriptor(){
     return true;   
 }
 
-// PRIVATE STATIC
+// PRIVATE STATIC 
 void* CamGst::mainLoop(void* ptr) {
     LOG_INFO("Start gst main loop");
     GMainLoop* gmain_loop = (GMainLoop*)ptr;
@@ -380,7 +382,13 @@ void* CamGst::mainLoop(void* ptr) {
     return NULL;
 }
 
-gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
+gboolean CamGst::callbackMessagesStatic(GstBus* bus, GstMessage* msg, gpointer data)
+{
+    CamGst* cam_gst = (CamGst*)data;
+    return cam_gst->callbackMessages(bus, msg, data);
+}
+
+gboolean CamGst::callbackMessages(GstBus* bus, GstMessage* msg, gpointer data)
 {
     //CamGst* cam_gst = (CamGst*)data;
     LOG_DEBUG("GStreamer callback message: %s", GST_MESSAGE_TYPE_NAME (msg));
@@ -409,6 +417,10 @@ gboolean CamGst::callbackMessages (GstBus* bus, GstMessage* msg, gpointer data)
     return true;
 }
 
+void CamGst::callbackNewBufferStatic(GstElement* object, CamGst* cam_gst_p) {
+    cam_gst_p->callbackNewBuffer(object, cam_gst_p);
+}   
+
 void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
     LOG_DEBUG("CamGst: callbackNewBuffer");
     pthread_mutex_lock(&mMutexBuffer);
@@ -425,6 +437,6 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
     //std::string name("cam_usb_test.jpg");
     //cam_gst_p->storeImageToFile(GST_BUFFER_DATA(mBuffer), mBufferSize, name);
     pthread_mutex_unlock(&mMutexBuffer);
-}   
+} 
 } // end namespace camera
 

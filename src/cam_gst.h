@@ -178,11 +178,24 @@ class CamGst {
     static void* mainLoop(void* ptr);
 
     /**
-     * Deletes pipeline if its end has been reached or an error occurred.
+     * Calls the method 'callbackMessages()' of the passed (using 'gpointer data') CamGst object.
      */
-    static gboolean callbackMessages (GstBus* bus, GstMessage* msg, gpointer data);
+    static gboolean callbackMessagesStatic(GstBus* bus, GstMessage* msg, gpointer data);
 
-    static void callbackNewBuffer(GstElement* object, CamGst* cam_gst_p); 
+    /**
+     * Reports GST_MESSAGE_EOS and GST_MESSAGE_ERROR messages.
+     */
+    gboolean callbackMessages(GstBus* bus, GstMessage* msg, gpointer data);
+
+    /**
+     * Calls the method 'callbackNewBuffer()' of the passed CamGst object.
+     */
+    static void callbackNewBufferStatic(GstElement* object, CamGst* cam_gst_p); 
+    
+    /**
+     * Copies the received image to 'mBuffer'.
+     */
+    void callbackNewBuffer(GstElement* object, CamGst* cam_gst_p); 
 
     /**
      * Print element factories for debugging purposes
@@ -197,10 +210,11 @@ class CamGst {
     GstElement* mPipeline;
     GstBus* mGstPipelineBus;
     bool mPipelineRunning;
-    static GstBuffer* mBuffer;
-    static uint32_t mBufferSize;
-    static pthread_mutex_t mMutexBuffer;
-    static bool mNewBuffer;
+
+    pthread_mutex_t mMutexBuffer;
+    GstBuffer* mBuffer;
+    uint32_t mBufferSize;
+    bool mNewBuffer;
 
     GstElement* mSource; // Used to request the fd.
     int mFileDescriptor; // File descriptor of the pipeline source. -1 if not available.
