@@ -586,7 +586,7 @@ void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
         return;
     }
 
-    if(mCamGSt != NULL) {
+    if(mCamGst != NULL) {
         delete mCamGst;
         mCamGst = NULL;
     }
