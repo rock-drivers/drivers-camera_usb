@@ -4,7 +4,7 @@ namespace camera
 {
 
 CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL),
-        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(0), 
+        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(10), 
         mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
     LOG_DEBUG("CamUsb: constructor");
@@ -221,7 +221,10 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
             mCamConfig->writeFPS((uint32_t)value);
-            mFps = value;
+            uint32_t cam_fps_tmp = 0;
+            mCamConfig->readFPS(&cam_fps_tmp);
+            LOG_WARN("Set (%d) and read (%d) FPS differs, set to %d", (uint32_t)value, cam_fps_tmp, cam_fps_tmp);
+            mFps = cam_fps_tmp;
             break;
         }
         default:

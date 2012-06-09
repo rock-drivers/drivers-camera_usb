@@ -76,14 +76,22 @@ class CamGst {
      * convert the image to jpeg and write the result to a buffer.
      * dspjpegenc is used if available (Gumstix), otherwise jpegenc.
      * Always use the device passed to the constructor.
-     * If you want to use the last set parameters, pass 0.
-     * E.g. 'createDefaultPipeline(0,0,0,80)' would just change the 
-     * JPEG quality.
+     * \param check_for_valid_params If set to true the parameters are validated.
+     * If they are not valid on the camera valid parameters are used. In addition if you 
+     * pass 0 for a parameter, the last valid parameter on the camera will be used.  
+     * E.g. 'createDefaultPipeline(0,0,0,80)' would just change the JPEG quality.
+     * But for this functionality a CamConfig object has to be created, which uses 
+     * the same device like GStreamer what should be avoided.
+     * In addition using this method within the CamUsb driver is not necessary because
+     * all parameters have been validated and set already.\n
+     * If set to false the pipeline may not be created if the parameters are not supported by
+     * the camera (a CamGstException may be thrown).
      */
     void createDefaultPipeline(uint32_t width = DEFAULT_WIDTH, 
             uint32_t height = DEFAULT_HEIGHT, 
             uint32_t fps = DEFAULT_FPS,
-            uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY);
+            uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY,
+            bool check_for_valid_params=false);
 
     /**
      * Deletes pipeline, clears buffer.
@@ -150,8 +158,7 @@ class CamGst {
      * \warning Use CamConfig to find and set valid camera parameters
      * (driver will choose most suitable). Can this lead to a blocked device?
      */
-    void setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps,
-            uint32_t* fpeg_quality);
+    void setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps);
 
     GstElement* createDefaultSource(std::string const& device);
 

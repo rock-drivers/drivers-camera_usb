@@ -78,12 +78,15 @@ void CamGst::printElementFactories() {
 }
 
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
-        uint32_t jpeg_quality) {
+        uint32_t jpeg_quality, bool check_for_valid_params) {
     LOG_DEBUG("CamGst: createDefaultPipeline");
     deletePipeline();
 
     // Sets the passed parameters if possible, otherwise valid ones.
-    setCameraParameters(&width, &height, &fps, &jpeg_quality);
+    if(check_for_valid_params) {
+        setCameraParameters(&width, &height, &fps);
+    }
+    mJpegQuality = jpeg_quality;
 
     GstElement* source = createDefaultSource(mDevice);
     mSource = source;
@@ -263,7 +266,7 @@ void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size,
 
 CamGst::CamGst() {}
 
-void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps, uint32_t* jpeg_quality) {
+void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fps) {
     LOG_DEBUG("CamGst: setCameraParameters");
     CamConfig config(mDevice);
 
@@ -271,7 +274,6 @@ void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fp
     if(*width == 0) config.getImageWidth(width);
     if(*height == 0) config.getImageHeight(height);
     if(*fps == 0) config.getFPS(fps);
-    if(*jpeg_quality == 0) *jpeg_quality = mJpegQuality;
 
     config.writeImagePixelFormat(*width, *height);
     config.writeFPS(*fps);
@@ -431,11 +433,18 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
         mBufferSize = 0; 
     }
     mBuffer = gst_app_sink_pull_buffer((GstAppSink*)object);
-    mBufferSize = GST_BUFFER_SIZE(mBuffer);
-    mNewBuffer = true;
-    LOG_DEBUG("New image received, size: %d",mBufferSize); 
-    //std::string name("cam_usb_test.jpg");
-    //cam_gst_p->storeImageToFile(GST_BUFFER_DATA(mBuffer), mBufferSize, name);
+
+    if(mBuffer == NULL) { // EOS was received before any buffer
+        mBufferSize = 0;
+        mNewBuffer = false;
+        LOG_WARN("EOS was received before any buffer");
+    } else {
+        mBufferSize = GST_BUFFER_SIZE(mBuffer);
+        mNewBuffer = true;
+        LOG_DEBUG("New image received, size: %d",mBufferSize); 
+        //std::string name("cam_usb_test.jpg");
+        //cam_gst_p->storeImageToFile(GST_BUFFER_DATA(mBuffer), mBufferSize, name);
+    }
     pthread_mutex_unlock(&mMutexBuffer);
 } 
 } // end namespace camera
