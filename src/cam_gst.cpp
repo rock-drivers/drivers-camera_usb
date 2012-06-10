@@ -30,7 +30,10 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mGstPipelineBus(NULL),
         mPipelineRunning(false),
         mSource(NULL),
-        mFileDescriptor(-1) {
+        mFileDescriptor(-1),
+        mBuffer(NULL),
+        mBufferSize(0),
+        mNewBuffer(false){
     LOG_DEBUG("CamGst: constructor");
     // gst_is_initialized() not available (since 0.10.31), 
     // could lead to a gst-mini-unref-warning.
@@ -442,8 +445,6 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
         mBufferSize = GST_BUFFER_SIZE(mBuffer);
         mNewBuffer = true;
         LOG_DEBUG("New image received, size: %d",mBufferSize); 
-        //std::string name("cam_usb_test.jpg");
-        //cam_gst_p->storeImageToFile(GST_BUFFER_DATA(mBuffer), mBufferSize, name);
     }
     pthread_mutex_unlock(&mMutexBuffer);
 } 
