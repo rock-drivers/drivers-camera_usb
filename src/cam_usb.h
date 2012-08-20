@@ -189,9 +189,11 @@ class CamUsb : public CamInterface {
     /**
      * Can be used to check the availability of v4l2 control IDs directly.
      * \param control_id id of the control to check.
+     * \param name For different cameras the same private base control id addresses different controls.
+     * If the name parameter is used, the name of the control is checked as well.
      * \return false if the camera is not in configuration mode or the attribute is not available.
      */
-    bool isV4L2AttribAvail(const int control_id);
+    bool isV4L2AttribAvail(const int control_id, std::string name = "");
 
     /**
      * Allows to request the last read control value

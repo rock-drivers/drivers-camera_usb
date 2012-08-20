@@ -436,7 +436,7 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
     }
 }
 
-bool CamUsb::isV4L2AttribAvail(const int control_id) {
+bool CamUsb::isV4L2AttribAvail(const int control_id, std::string name) {
     LOG_DEBUG("CamUsb: isV4L2AttribAvail");
    
     if(mCamMode != CAM_USB_V4L2) {
@@ -444,7 +444,21 @@ bool CamUsb::isV4L2AttribAvail(const int control_id) {
         return false;
     }
 
-    return(mCamConfig->isControlIdValid(control_id));
+    if(!mCamConfig->isControlIdValid(control_id)) {
+        return false;
+    }
+
+    if(!name.empty()) {
+        std::string control_name;
+        mCamConfig->getControlName(control_id, &control_name);
+        if(control_name.compare(name) != 0) { // control names differ
+            LOG_DEBUG("Control names differ. Passed name: %s, control name: %s", 
+                    name.c_str(), control_name.c_str());
+            return false;
+        }
+    }
+
+    return true;
 }
 
 int CamUsb::getV4L2Attrib(const int control_id) {
