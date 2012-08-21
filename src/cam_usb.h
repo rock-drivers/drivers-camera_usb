@@ -35,26 +35,17 @@ namespace camera
 
     static const std::string ModeTxt[] = { "CAM_USB_NONE", "CAM_USB_V4L2", "CAM_USB_GST" };
 /**
- * Uses CamConfig to set and get all releveant camera parameters.
- * The GStreamer component starts a thread internally requesting images from the
- * same device camera-config is working with. This could lead to 
- * an exception telling the device is already in use.
- * Therefore, this class takes care that configuration is only possible if the
- * device is closed / the pipeline is deleted.\n
- * To get an image you have to do:\n
- * 1. CamUsb constructor passing the device.
- * 2. listCameras to get a list of available cameras.
- * 3. open one of the available cameras (here always the first and only one), allows configuration.
- * 4. setFrameSettings to define the size, mode and data_depth of the image.
- *    optional: set attributes like brightness etc.
- * 5. call grab to start requesting images -> startes the GStreamer pipeline. 
- * 6. retrieveFrame to get a Frame.
- *
- * General informations for get-, set- and isAvailable Attribute:
- * isAvailable will not throw an exception, get and set will throw runtime_error if 
- * we are not in the configuration mode, the attribute is unknown or an error occurred.
- * Attention: isAvailable can return false if the camera is not in configuration mode and if 
- * the attribute is not available.
+ * 
+ * Allows configuration and image-requesting of cameras supported by Video4Linux.
+ * 1. Pass the video-device (e.g. '/dev/video0') to the constructor.
+ * 2. Call 'listCameras()' to get the CamInfo structure of the single supported camera.
+ * 3. Opens the camera with 'open()' entering the configuration mode via v4l2.
+ * 4. Call setFrameSettings() to define the image size. 
+ * 5. (optional) Use ' setAttrib()' to change default attributes of the camera interface and 
+ *    'setV4L2Attrib()' to change special private attributes of the camera not defined by the interface.
+ * 6. Call 'grab()' to create and start the GStreamer pipeline (switching from configuration mode to
+ *    image requesting mode -> for further configuration the pipeline has to be stopped again).
+ * 7. Use 'retrieveFrame()' to get a Frame.
  */
 class CamUsb : public CamInterface {
 
@@ -96,6 +87,7 @@ class CamUsb : public CamInterface {
     /**
      * To start the pipeline, just set 'mode' to sth. other than Stop (SingleFrame,
      * MultiFrame or Continuously). Images are always grapped continuously.
+     * Pass Stop to stop grabbing and reenter the configuration mode. 
      * Could throw std::runtime_error if the passed mode is unknown or the mode should 
      * changed during the pipeline is running.
      * \return Return false if the pipeline could not be started.

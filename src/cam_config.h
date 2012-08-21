@@ -53,9 +53,7 @@ class CamConfigException : public std::runtime_error {
 
 /**
  * Using v4l2 to read and set the parameters of the specified camera.
- * An object of this class may not be used parallel to CamGst, because they would block the device.
- * Thus, use this to configure your camera and set parameters and delete it afterwards.
- * Important: For newly-connected cameras the device driver can return a wrong image size!
+ * Important: For newly-connected cameras the device driver may return a wrong image size!
  * Prevent that by calling writeImagePixelFormat() without any parameters during initialization.
  */
 class CamConfig
