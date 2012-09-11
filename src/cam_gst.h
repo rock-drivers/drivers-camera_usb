@@ -96,12 +96,19 @@ class CamGst {
     void deletePipeline();
 
     /**
-     * Starts current pipeline in another a GStreamer intern thread.
-     * Pipeline has to be already created.
+     * Starts current pipeline in another a intern GStreamer thread.
+     * Pipeline has to be already created. Restarting may not work, in this case
+     * an error message will be printed and false will be returned.
+     * \warning Just stopping and starting a pipeline may not work.
+     * You should delete and recreate the pipeline instead!
      * \return True if its already running or could be started.
      */
     bool startPipeline();
 
+    /**
+     * \warning Just stopping and starting a pipeline may not work.
+     * You should delete and recreate the pipeline instead!
+     */
     void stopPipeline();
 
     /**

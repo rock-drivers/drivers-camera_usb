@@ -1,11 +1,6 @@
 #include "cam_gst.h"
 
-/*
-GstBuffer* camera::CamGst::mBuffer = NULL;
-uint32_t camera::CamGst::mBufferSize = 0;
-pthread_mutex_t camera::CamGst::mMutexBuffer;
-bool camera::CamGst::mNewBuffer = false;
-*/
+#include <sys/time.h>
 
 namespace camera 
 {
@@ -155,11 +150,22 @@ bool CamGst::startPipeline() {
 
     ret_state = gst_element_set_state(mPipeline, GST_STATE_PLAYING);
     LOG_DEBUG("Set pipeline to playing returned %d",ret_state); 
+
+    timeval start, end;
+    gettimeofday(&start, 0);
+    int time_passed_msec = 0;
     
     if(ret_state == GST_STATE_CHANGE_ASYNC) {
         // gst_element_get_state will return immediately (other than written in the gst-docu!)
         do {
             ret_state = gst_element_get_state(mPipeline, &state, NULL, DEFAULT_PIPELINE_TIMEOUT);
+            gettimeofday(&end, 0);
+            
+            time_passed_msec = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+            if(time_passed_msec > DEFAULT_PIPELINE_TIMEOUT) {
+                LOG_ERROR("Pipeline could not be started. If you wanted to restart the pipeline, try to delete and recreate the pipeline instead");
+                return false;
+            }
         } while(ret_state == GST_STATE_CHANGE_ASYNC);
     } else {
         ret_state = gst_element_get_state(mPipeline, &state, NULL, DEFAULT_PIPELINE_TIMEOUT);
@@ -194,6 +200,7 @@ void CamGst::stopPipeline() {
 
     // Setting to GST_STATE_NULL does not happen asynchronously, wait until stop.
     gst_element_set_state(mPipeline, GST_STATE_NULL);
+    mPipelineRunning = false;
 
     rmFileDescriptor();
 }
@@ -258,9 +265,14 @@ bool CamGst::skipBuffer() {
 
 void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
         std::string const& file_name) {
-    LOG_DEBUG("CamGst: storeImageToFile");
-    FILE* file;
+    LOG_DEBUG("CamGst: storeImageToFile, buffer contains %d bytes, stores to %s", 
+            buf_size, file_name.c_str());
+    FILE* file = NULL;
     file = fopen(file_name.c_str(),"w");
+    if(file == NULL) {
+        LOG_ERROR("File %s could not be opened, no image will be stored", file_name.c_str());
+        return;
+    }
   	fwrite (buffer, 1 , buf_size , file);
     fclose(file);
 }
