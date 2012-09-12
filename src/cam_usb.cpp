@@ -18,6 +18,14 @@ CamUsb::~CamUsb() {
     changeCameraMode(CAM_USB_NONE);
 }
 
+void CamUsb::fastInit(int width, int height) {
+    std::vector<CamInfo> cam_infos;
+    listCameras(cam_infos);
+    open(cam_infos[0]);
+    const base::samples::frame::frame_size_t size(width, height);
+    setFrameSettings(size, base::samples::frame::MODE_JPEG, 3);
+}
+
 int CamUsb::listCameras(std::vector<CamInfo> &cam_infos)const {
     LOG_DEBUG("CamUsb: listCameras");
 
@@ -156,6 +164,10 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
 
     mReceivedFrameCounter++;
     return true;
+}
+
+bool CamUsb::storeFrame(base::samples::frame::Frame& frame, std::string const& file_name) {
+    return mCamGst->storeImageToFile(frame.getImagePtr(), frame.getNumberOfBytes(), file_name);
 }
 
 bool CamUsb::isFrameAvailable() {

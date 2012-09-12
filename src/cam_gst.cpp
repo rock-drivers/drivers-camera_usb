@@ -24,11 +24,12 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mPipeline(NULL),
         mGstPipelineBus(NULL),
         mPipelineRunning(false),
-        mSource(NULL),
-        mFileDescriptor(-1),
         mBuffer(NULL),
         mBufferSize(0),
-        mNewBuffer(false){
+        mNewBuffer(false),
+        mSource(NULL),
+        mFileDescriptor(-1)
+{
     LOG_DEBUG("CamGst: constructor");
     // gst_is_initialized() not available (since 0.10.31), 
     // could lead to a gst-mini-unref-warning.
@@ -162,7 +163,7 @@ bool CamGst::startPipeline() {
             gettimeofday(&end, 0);
             
             time_passed_msec = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
-            if(time_passed_msec > DEFAULT_PIPELINE_TIMEOUT) {
+            if(time_passed_msec > (int)DEFAULT_PIPELINE_TIMEOUT) {
                 LOG_ERROR("Pipeline could not be started. If you wanted to restart the pipeline, try to delete and recreate the pipeline instead");
                 return false;
             }
@@ -263,18 +264,30 @@ bool CamGst::skipBuffer() {
     return skipped;
 }
 
-void CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
+bool CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
         std::string const& file_name) {
     LOG_DEBUG("CamGst: storeImageToFile, buffer contains %d bytes, stores to %s", 
             buf_size, file_name.c_str());
+
+    if(buffer == NULL || buf_size == 0) {
+        LOG_WARN("Empty buffer passed, nothing will be stored");
+        return false;
+    }
+
     FILE* file = NULL;
     file = fopen(file_name.c_str(),"w");
     if(file == NULL) {
         LOG_ERROR("File %s could not be opened, no image will be stored", file_name.c_str());
-        return;
+        return false;
     }
-  	fwrite (buffer, 1 , buf_size , file);
+  	unsigned int written = fwrite (buffer, 1 , buf_size , file);
+    if(written != buf_size) {
+        LOG_ERROR("Only %d of %d bytes could be written", written, buf_size);
+        fclose(file);
+        return false;
+    }
     fclose(file);
+    return true;
 }
 
 // PRIVATE

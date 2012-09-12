@@ -35,6 +35,8 @@ BOOST_AUTO_TEST_CASE(init_test) {
     std::cout << "Change frame settings to 640,480,MODE_JPEG, 3" << std::endl;
     base::samples::frame::frame_size_t size(640,480);
     BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
+    
+    usb.fastInit(640, 480); // same like before
 }
 
 BOOST_AUTO_TEST_CASE(buffer_test) {

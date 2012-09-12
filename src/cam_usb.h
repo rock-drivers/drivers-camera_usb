@@ -41,11 +41,13 @@ namespace camera
  * 2. Call 'listCameras()' to get the CamInfo structure of the single supported camera.
  * 3. Opens the camera with 'open()' entering the configuration mode via v4l2.
  * 4. Call setFrameSettings() to define the image size. 
- * 5. (optional) Use ' setAttrib()' to change default attributes of the camera interface and 
+ * 5. (optional) Use 'setAttrib()' to change default attributes of the camera interface and 
  *    'setV4L2Attrib()' to change special private attributes of the camera not defined by the interface.
  * 6. Call 'grab()' to create and start the GStreamer pipeline (switching from configuration mode to
  *    image requesting mode -> for further configuration the pipeline has to be stopped again).
  * 7. Use 'retrieveFrame()' to get a Frame.
+ *
+ * You can use 'fastInit(width, height)' for the steps 2, 3 and 4.
  */
 class CamUsb : public CamInterface {
 
@@ -56,6 +58,16 @@ class CamUsb : public CamInterface {
     CamUsb(std::string const& device);
 
     ~CamUsb();
+
+    /**
+     * Fast configuration of the camera (step 2 to 4).
+     * Opens the camera and sets the frame size.
+     * After this configuration, additional attributes can be set, the camera can be started by using
+     * grab() and the images can be retrieved with retrieveFrame().
+     * If the camera does not support the passed width and height, an appropriate image
+     * size will be set.
+     */
+    void fastInit(int width, int height);
     
     /**
      * Adds the single cam_info structure to the passed vector.
@@ -96,10 +108,14 @@ class CamUsb : public CamInterface {
 
     /**
      * Reads a JPEG and initializes the passed frame (blocking read).
-     * TODO Put timestamp information in frame.
      * \return true if a new image could be requested in 'timeout' msecs.
      */
     virtual bool retrieveFrame(base::samples::frame::Frame &frame,const int timeout=1000);
+
+    /**
+     * Stores the last retrieved frame to 'file_name'.
+     */
+    bool storeFrame(base::samples::frame::Frame& frame, std::string const& file_name);
 
     /**
      * Same as grab(), returns true if a new image is available.

@@ -114,7 +114,7 @@ class CamGst {
     /**
      * Allows to request a copy of the new image.
      * \param buffer Will be set to the new image or NULL if no new image is available.
-     * Take care to free the returned image!
+     * \warning Take care to free the returned image!
      * \param buf_size Will get the image size or 0 if no image is available.
      * \param blocking_read If true, method will return as soon as a new image is available. 
      * \param timeout Max. time to wait for the frame in msec. < 1 means no timeout.
@@ -131,7 +131,11 @@ class CamGst {
      */
     bool skipBuffer();
 
-    void storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
+    /**
+     * Stores the image to a file.
+     * \return false if the file could not be opened or not all of the bytes could be written.
+     */
+    bool storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
             std::string const& file_name);
 
     /**
