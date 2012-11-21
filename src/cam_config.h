@@ -171,7 +171,7 @@ class CamConfig
      */
     bool getControlValue(uint32_t const id, int32_t* value);
 
-    bool getControlType(uint32_t const id, enum v4l2_ctrl_type* type);
+    bool getControlType(uint32_t const id, uint32_t* type);
 
     bool getControlName(uint32_t const id, std::string* name);
 
@@ -228,7 +228,7 @@ class CamConfig
     /**
      * Whats this?
      */ 
-    bool getImageField(enum v4l2_field* field);
+    bool getImageField(uint32_t* field);
 
     /**
      * For padding, zero if unused.
@@ -237,7 +237,7 @@ class CamConfig
 
     bool getImageSizeimage(uint32_t* sizeimage);
 
-    bool getImageColorspace(enum v4l2_colorspace* colorspace);
+    bool getImageColorspace(uint32_t* colorspace);
 
  public: // STREAMPARM, not suuported by e-CAM32!
     void readStreamparm();

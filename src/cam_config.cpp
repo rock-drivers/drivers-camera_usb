@@ -509,7 +509,7 @@ bool CamConfig::getControlValue(uint32_t const id, int32_t* value) {
     return true;   
 }
 
-bool CamConfig::getControlType(uint32_t const id, enum v4l2_ctrl_type* type) { 
+bool CamConfig::getControlType(uint32_t const id, uint32_t* type) { 
     std::map<uint32_t, struct CamCtrl>::iterator it;
     it = mCamCtrls.find(id);
 
@@ -720,10 +720,10 @@ bool CamConfig::getImagePixelformatString(std::string* pixelformat_str) {
     if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
         return false;
     
-    unsigned char c1 =  mFormat.fmt.pix.pixelformat & 0xFF;
-    unsigned char c2 =  (mFormat.fmt.pix.pixelformat >> 8) & 0xFF;
-    unsigned char c3 =  (mFormat.fmt.pix.pixelformat >> 16) & 0xFF;
-    unsigned char c4 =  (mFormat.fmt.pix.pixelformat >> 24) & 0xFF;
+    char c1 =  mFormat.fmt.pix.pixelformat & 0xFF;
+    char c2 =  (mFormat.fmt.pix.pixelformat >> 8) & 0xFF;
+    char c3 =  (mFormat.fmt.pix.pixelformat >> 16) & 0xFF;
+    char c4 =  (mFormat.fmt.pix.pixelformat >> 24) & 0xFF;
 
     char buffer[5] = {c1,c2,c3,c4,'\0'};
     std::string str(buffer);
@@ -732,7 +732,7 @@ bool CamConfig::getImagePixelformatString(std::string* pixelformat_str) {
     return true;
 }
 
-bool CamConfig::getImageField(enum v4l2_field* field) {
+bool CamConfig::getImageField(uint32_t* field) {
     if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
@@ -765,7 +765,7 @@ bool CamConfig::getImageSizeimage(uint32_t* sizeimage) {
     return true;
 }
 
-bool CamConfig::getImageColorspace(enum v4l2_colorspace* colorspace) {
+bool CamConfig::getImageColorspace(uint32_t* colorspace) {
     if(mFormat.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         LOG_DEBUG("Format type %d, no image data stored", mFormat.type);
         return false;
