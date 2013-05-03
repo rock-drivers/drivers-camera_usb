@@ -353,6 +353,7 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
                     char buffer[32];
                     snprintf(buffer, 32, "%s", querymenu_tmp.name);
                     cam_ctrl.mMenuItems.push_back(buffer);
+                    LOG_DEBUG(" - menu entry %s", buffer);
                 } else {
                     std::string err_str(strerror(errno));
                     throw std::runtime_error(err_str.insert(0, 
@@ -365,7 +366,8 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         try {
             cam_ctrl.mValue = readControlValue(original_control_id);
         } catch(std::runtime_error& e) {
-            // Assuming write-only control (id valid, only read operation should work)
+            // Assuming write-only control (id valid, only write operation should work)
+            LOG_DEBUG("Control ID %d seem to be write-only", original_control_id);
             cam_ctrl.mWriteOnly = true;
         }
 

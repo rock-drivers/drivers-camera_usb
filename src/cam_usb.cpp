@@ -252,7 +252,7 @@ bool setAttrib(const str_attrib::CamAttrib attrib,const std::string value) {
 }
 
 bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
-    LOG_DEBUG("CamUsb: setAttrib enum");
+    LOG_DEBUG("CamUsb: setAttrib enum %i", attrib);
 
     if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before setting an enum attribute.");
