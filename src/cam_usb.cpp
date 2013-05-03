@@ -313,7 +313,7 @@ bool CamUsb::isAttribAvail(const int_attrib::CamAttrib attrib) {
     if(it == mMapAttrsCtrlsInt.end())
         return false;
     else
-        return mCamConfig->isControlIdValid(it->second);
+        return mCamConfig->isControlIdWritable(it->second);
 }
 
 bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {

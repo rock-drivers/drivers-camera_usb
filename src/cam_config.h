@@ -159,11 +159,15 @@ class CamConfig
     void listControls();
 
     /**
-     * Returns the last stored value of the control.
-     * If you want to take care that the value is the same value stored on the camera,
-     * use 'readControlValue()' (but be careful the device is not in used).
+     * Returns whether this v4l control ID is available on this device
      */
-    bool isControlIdValid(uint32_t const id);
+    bool isControlIdValid(uint32_t const id) const;
+
+    /**
+     * Returns whether this v4l control ID is available on this device, and
+     * whether it can be written to
+     */
+    bool isControlIdWritable(uint32_t const id) const;
 
     /**
      * Gets the last set control value, use 'readControl()' if you 

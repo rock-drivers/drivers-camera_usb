@@ -493,8 +493,13 @@ void CamConfig::listControls() {
     }       
 }
 
-bool CamConfig::isControlIdValid(uint32_t const id) {
-    return (mCamCtrls.find(id) != mCamCtrls.end());
+bool CamConfig::isControlIdValid(uint32_t const id) const {
+    std::map<uint32_t, CamCtrl>::const_iterator it = mCamCtrls.find(id);
+    return (it != mCamCtrls.end()) && !(it->second.mReadOnly);
+}
+
+bool CamConfig::isControlIdWritable(uint32_t const id) const {
+    return isControlIdValid(id) && !mCamCtrls.find(id)->second.mReadOnly;
 }
 
 bool CamConfig::getControlValue(uint32_t const id, int32_t* value) {
