@@ -371,6 +371,18 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
             cam_ctrl.mWriteOnly = true;
         }
 
+        // Try writing the current value back
+        if (!cam_ctrl.mReadOnly)
+        {
+            try {
+                writeControlValue(original_control_id, cam_ctrl.mValue);
+            } catch(std::runtime_error& e) {
+                // Assuming read-only control (id valid, only read operation should work)
+                LOG_DEBUG("Control ID %d seem to be read-only", original_control_id);
+                cam_ctrl.mReadOnly = true;
+            }
+        }
+
         // Store CamCtrl using control ID as key.
         mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
     } else {
