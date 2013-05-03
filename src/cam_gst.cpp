@@ -218,8 +218,6 @@ bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read,
         pthread_mutex_lock(&mMutexBuffer);
         if(mBuffer == NULL || mBufferSize == 0 || mNewBuffer == false) {
             if(!blocking_read) { // !blocking: unlock and return.
-                *buf_size = 0;
-                *buffer = NULL;
                 pthread_mutex_unlock(&mMutexBuffer);
                 LOG_DEBUG("No image available");
                 return false;
@@ -229,10 +227,8 @@ bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read,
             }
         } else {
             // Copy buffer for return.
-            uint8_t* tmp_buffer = (uint8_t*)calloc(mBufferSize, 1);
-            memcpy(tmp_buffer, GST_BUFFER_DATA(mBuffer), mBufferSize);
-            *buf_size = mBufferSize;
-            *buffer = tmp_buffer;
+            buffer.resize(mBufferSize);
+            memcpy(&buffer[0], GST_BUFFER_DATA(mBuffer), mBufferSize);
             mNewBuffer = false;
             pthread_mutex_unlock(&mMutexBuffer);
             blocking_read = false; // Done, return true.
@@ -264,12 +260,12 @@ bool CamGst::skipBuffer() {
     return skipped;
 }
 
-bool CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
+bool CamGst::storeImageToFile(std::vector<uint8_t> const& buffer, 
         std::string const& file_name) {
     LOG_DEBUG("CamGst: storeImageToFile, buffer contains %d bytes, stores to %s", 
-            buf_size, file_name.c_str());
+            buffer.size(), file_name.c_str());
 
-    if(buffer == NULL || buf_size == 0) {
+    if(buffer.empty()) {
         LOG_WARN("Empty buffer passed, nothing will be stored");
         return false;
     }
@@ -280,9 +276,9 @@ bool CamGst::storeImageToFile(uint8_t* const buffer, uint32_t const buf_size,
         LOG_ERROR("File %s could not be opened, no image will be stored", file_name.c_str());
         return false;
     }
-  	unsigned int written = fwrite (buffer, 1 , buf_size , file);
-    if(written != buf_size) {
-        LOG_ERROR("Only %d of %d bytes could be written", written, buf_size);
+  	unsigned int written = fwrite (&buffer[0], 1 , buffer.size(), file);
+    if(written != buffer.size()) {
+        LOG_ERROR("Only %d of %d bytes could be written", written, buffer.size());
         fclose(file);
         return false;
     }

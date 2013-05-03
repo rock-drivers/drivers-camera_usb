@@ -147,27 +147,24 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
         LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
         return false;
     }
-    uint8_t* buffer = NULL;
-    uint32_t buf_size = 0;
+
+    frame.init(image_size_.width, image_size_.height, 8, image_mode_, 0);
     // Write directly to the frame buffer.
-    bool success = mCamGst->getBuffer(&buffer, &buf_size, true, timeout);
+    bool success = mCamGst->getBuffer(frame.image, true, timeout);
     if(!success) {
         LOG_ERROR("Buffer could not retrieved.");
         return false;
     }
 
-    frame.init(image_size_.width, image_size_.height, 8, image_mode_, 0, buf_size);
-    frame.setImage((char*)buffer, buf_size);
     frame.frame_status = base::samples::frame::STATUS_VALID;
     frame.time = base::Time::now();
-    delete buffer; buffer = NULL;
 
     mReceivedFrameCounter++;
     return true;
 }
 
 bool CamUsb::storeFrame(base::samples::frame::Frame& frame, std::string const& file_name) {
-    return mCamGst->storeImageToFile(frame.getImagePtr(), frame.getNumberOfBytes(), file_name);
+    return mCamGst->storeImageToFile(frame.image, file_name);
 }
 
 bool CamUsb::isFrameAvailable() {

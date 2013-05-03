@@ -122,8 +122,8 @@ class CamGst {
      * blocking_read active: Returns true as soon as a new image is available or false 
      * after 'timeout' msec.
      */
-    bool getBuffer(uint8_t** buffer, uint32_t* buf_size, 
-            bool blocking_read=FALSE, int32_t timeout=0);
+    bool getBuffer(std::vector<uint8_t>& buffer, 
+            bool blocking_read=false, int32_t timeout=0);
 
     /**
      * Just sets mNewBuffer to false.
@@ -135,7 +135,7 @@ class CamGst {
      * Stores the image to a file.
      * \return false if the file could not be opened or not all of the bytes could be written.
      */
-    bool storeImageToFile(uint8_t* const buffer, uint32_t const buf_size, 
+    bool storeImageToFile(std::vector<uint8_t> const& buffer, 
             std::string const& file_name);
 
     /**

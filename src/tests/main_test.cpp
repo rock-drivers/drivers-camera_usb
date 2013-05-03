@@ -54,8 +54,7 @@ int main(int argc, char* argv[])
     CamMenu cam_menu = MAIN;
     CamConfig* cam_config = NULL;
     CamGst* cam_gst = NULL;
-    uint8_t* buffer = NULL;
-    uint32_t buf_size = 0; 
+    std::vector<uint8_t> buffer;
 
     while(true) {
         switch(cam_menu) {
@@ -119,19 +118,19 @@ int main(int argc, char* argv[])
                 ret = getRequest(1, 3);
                 switch(ret) {
                     case 1: {
-                        if(!cam_gst->getBuffer(&buffer, &buf_size, TRUE, 2000)) {
+                        if(!cam_gst->getBuffer(buffer, true, 2000)) {
                             std::cout << "Image could not be requested" << std::endl;
                         } else {
-                            std::cout << "Image requested (" << buf_size << " bytes)" << std::endl;
+                            std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
                         }
                         break;
                     }
                     case 2: {
-                        if(buffer == NULL) {
+                        if(buffer.empty()) {
                             std::cout << "Request an image first" << std::endl;
                         } else {
                             std::string file_name("test_img.jpg");
-                            cam_gst->storeImageToFile(buffer, buf_size, file_name);
+                            cam_gst->storeImageToFile(buffer, file_name);
                         }
                         break;
                     }
