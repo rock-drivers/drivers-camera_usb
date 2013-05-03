@@ -30,6 +30,7 @@ extern "C" {
 #include <iostream>
 
 #include "cam_config.h"
+#include <base/samples/frame.h>
 
 namespace camera 
 {
@@ -51,6 +52,7 @@ class CamGst {
     static const uint32_t DEFAULT_WIDTH = 640;
     static const uint32_t DEFAULT_HEIGHT = 480;
     static const uint32_t DEFAULT_FPS = 10;
+    static const uint32_t DEFAULT_BPP = 24;
     static const uint32_t DEFAULT_JPEG_QUALITY = 85; // 0 to 100
     static const uint32_t DEFAULT_PIPELINE_TIMEOUT = 4000000; // 4 sec.
 
@@ -87,6 +89,8 @@ class CamGst {
     void createDefaultPipeline(uint32_t width = DEFAULT_WIDTH, 
             uint32_t height = DEFAULT_HEIGHT, 
             uint32_t fps = DEFAULT_FPS,
+	    uint32_t bpp = DEFAULT_BPP,
+	    base::samples::frame::frame_mode_t mode = base::samples::frame::MODE_UNDEFINED,
             uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY,
             bool check_for_valid_params=false);
 
@@ -170,7 +174,7 @@ class CamGst {
 
     GstElement* createDefaultSource(std::string const& device);
 
-    GstElement* createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps );
+    GstElement* createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps, uint32_t bpp, base::samples::frame::frame_mode_t mode );
 
     GstElement* createDefaultEncoder(int32_t const jpeg_quality);
 

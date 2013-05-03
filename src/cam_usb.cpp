@@ -4,8 +4,8 @@ namespace camera
 {
 
 CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL),
-        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(10), 
-        mStartTimeGrabbing(), mReceivedFrameCounter(0),
+        mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(10),
+        mBpp(24), mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
     LOG_DEBUG("CamUsb: constructor");
     mDevice = device;
@@ -118,7 +118,10 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
         case Continuously: {
             changeCameraMode(CAM_USB_GST);
              // If one of the parameters is 0, the current setting of the camera is used.
-            mCamGst->createDefaultPipeline(image_size_.width, image_size_.height, (uint32_t)mFps);
+            mCamGst->createDefaultPipeline(
+                    image_size_.width, image_size_.height,
+                    (uint32_t)mFps, (uint32_t)mBpp,
+                    image_mode_);
             bool pipeline_started = false;
             pipeline_started = mCamGst->startPipeline();
             mReceivedFrameCounter = 0;
@@ -509,9 +512,6 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
         return false;
     }
 
-    if(mode != base::samples::frame::MODE_JPEG)
-        LOG_WARN("Warning: mode should be set to base::samples::frame::MODE_JPEG!");
-    
     LOG_DEBUG("color_depth is set to %d", (int)color_depth);
 
     mCamConfig->writeImagePixelFormat(size.width, size.height); // use V4L2_PIX_FMT_YUV420?

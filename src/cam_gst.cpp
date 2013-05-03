@@ -1,6 +1,8 @@
 #include "cam_gst.h"
-
 #include <sys/time.h>
+#include <boost/lexical_cast.hpp>
+
+using namespace base::samples::frame;
 
 namespace camera 
 {
@@ -77,6 +79,7 @@ void CamGst::printElementFactories() {
 }
 
 void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
+        uint32_t bpp, frame_mode_t image_mode,
         uint32_t jpeg_quality, bool check_for_valid_params) {
     LOG_DEBUG("CamGst: createDefaultPipeline");
     deletePipeline();
@@ -88,10 +91,11 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
     mJpegQuality = jpeg_quality;
 
     GstElement* source = createDefaultSource(mDevice);
-    mSource = source;
-    GstElement* cap = createDefaultCap(width, height, fps); // format
-    GstElement* encoder = createDefaultEncoder(jpeg_quality);
+    GstElement* colorspace  = gst_element_factory_make("ffmpegcolorspace", "colorspace");
+    if(colorspace == NULL)
+        throw CamGstException("Colorspace convertion element could not be created");
     GstElement* sink = createDefaultSink();
+    mSource = source;
 
     if((mPipeline = gst_pipeline_new ("default_pipeline")) == NULL) {
         throw CamGstException("Default pipeline could not be created.");    
@@ -105,13 +109,26 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
     mGstPipelineBus = gst_pipeline_get_bus (GST_PIPELINE (mPipeline));
     gst_bus_add_watch (mGstPipelineBus, callbackMessagesStatic, this);  
 
+    GstElement* cap = 0;
     // Add elements to pipeline.
-    gst_bin_add_many (GST_BIN (mPipeline), source, cap, encoder, sink, (void*)NULL);
+    if (image_mode == MODE_JPEG)
+    {
+        cap = createDefaultCap(width, height, fps, bpp, MODE_UNDEFINED); // format
+        GstElement* encoder = createDefaultEncoder(jpeg_quality);
+        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, encoder, sink, (void*)NULL);
+        if (!gst_element_link_many (source, colorspace, cap, encoder, sink, (void*)NULL)) {
+            throw CamGstException("Failed to link default pipeline!");
+        } 
+    }
+    else
+    {
+        cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
+        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
+        if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
+            throw CamGstException("Failed to link default pipeline!");
+        } 
+    }
 
-    // Link elements.
-    if (!gst_element_link_many (source, cap, encoder, sink, (void*)NULL)) {
-	    throw CamGstException("Failed to link default pipeline!");
-    } 
 }
 
 void CamGst::deletePipeline() {
@@ -206,7 +223,7 @@ void CamGst::stopPipeline() {
     rmFileDescriptor();
 }
 
-bool CamGst::getBuffer(uint8_t** buffer, uint32_t* buf_size, bool blocking_read, 
+bool CamGst::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, 
         int32_t timeout) {
     LOG_DEBUG("CamGst: getBuffer");
     struct timeval start, end;
@@ -320,23 +337,65 @@ GstElement* CamGst::createDefaultSource(std::string const& device) {
     return element;
 }
 
+static std::string toGstreamerMediaType(frame_mode_t mode)
+{
+    switch(mode)
+    {
+        case MODE_GRAYSCALE: return "video/x-raw-gray";
+        case MODE_RGB:       return "video/x-raw-rgb";
+        case MODE_UYVY:      return "video/x-raw-yuv";
+        default:
+            throw std::runtime_error("does not know the media type for mode " + boost::lexical_cast<std::string>(mode));
+    }
+}
+
+static std::string toGstreamerFourCC(frame_mode_t mode)
+{
+    switch(mode)
+    {
+        case MODE_GRAYSCALE: return "";
+        case MODE_RGB:       return "";
+        case MODE_UYVY:      return "UYVY";
+        default:
+            throw std::runtime_error("does not know the media type for mode " + boost::lexical_cast<std::string>(mode));
+    }
+}
+
 // remove format, bb to 24?
-GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps ) {
+GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps, uint32_t bpp, frame_mode_t image_mode ) {
     LOG_DEBUG("createDefaultCap, width: %d, height: %d, fps: %d", width, height, fps);
     GstElement* element = gst_element_factory_make("capsfilter", "default_cap");
     if(element == NULL)
         throw CamGstException("Default cap could not be created.");
-    // Set property 'caps' of element 'capsfilter'.
-    g_object_set (G_OBJECT (element), 
-            // Create capability.
-            "caps", gst_caps_new_simple ("video/x-raw-yuv",
-            //"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('I', '4', '2', '0'),
+
+    std::string media_type("video/x-raw-yuv"), fourcc;
+    if (image_mode != MODE_UNDEFINED)
+    {
+        media_type = toGstreamerMediaType(image_mode);
+        fourcc     = toGstreamerFourCC(image_mode);
+    }
+    if (image_mode == MODE_GRAYSCALE)
+        bpp = 8;
+
+    GstCaps* caps = gst_caps_new_simple (media_type.c_str(),
             "width", G_TYPE_INT, width,
             "height", G_TYPE_INT, height,
             "framerate", GST_TYPE_FRACTION, fps, 1,
-            "bpp", G_TYPE_INT, 24,
-            (void*)NULL), 
-        (void*)NULL);
+            "bpp", G_TYPE_INT, bpp,
+            (void*)NULL);
+    if (!fourcc.empty())
+    {
+        gst_caps_set_simple(caps,
+                "format", GST_TYPE_FOURCC, GST_STR_FOURCC (fourcc.c_str()),
+                (void*)NULL);
+    }
+
+    char* debug_str = gst_caps_to_string(caps);
+    LOG_DEBUG("createDefaultCap: %s", debug_str);
+    g_free(debug_str);
+
+    // Set property 'caps' of element 'capsfilter'.
+    g_object_set (G_OBJECT (element), "caps", caps, (void*)NULL);
     return element;
 }
 
