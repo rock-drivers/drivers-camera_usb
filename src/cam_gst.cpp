@@ -111,24 +111,11 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
 
     GstElement* cap = 0;
     // Add elements to pipeline.
-    if (image_mode == MODE_JPEG)
-    {
-        cap = createDefaultCap(width, height, fps, bpp, MODE_UNDEFINED); // format
-        GstElement* encoder = createDefaultEncoder(jpeg_quality);
-        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, encoder, sink, (void*)NULL);
-        if (!gst_element_link_many (source, colorspace, cap, encoder, sink, (void*)NULL)) {
-            throw CamGstException("Failed to link default pipeline!");
-        } 
-    }
-    else
-    {
-        cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
-        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
-        if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
-            throw CamGstException("Failed to link default pipeline!");
-        } 
-    }
-
+    cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
+    gst_bin_add_many (GST_BIN (mPipeline), source, cap, sink, (void*)NULL);
+    if (!gst_element_link_many (source, cap, sink, (void*)NULL)) {
+        throw CamGstException("Failed to link default pipeline!");
+    } 
 }
 
 void CamGst::deletePipeline() {
@@ -344,6 +331,7 @@ static std::string toGstreamerMediaType(frame_mode_t mode)
         case MODE_GRAYSCALE: return "video/x-raw-gray";
         case MODE_RGB:       return "video/x-raw-rgb";
         case MODE_UYVY:      return "video/x-raw-yuv";
+        case MODE_JPEG:      return "image/jpeg";
         default:
             throw std::runtime_error("does not know the media type for mode " + boost::lexical_cast<std::string>(mode));
     }
@@ -356,6 +344,7 @@ static std::string toGstreamerFourCC(frame_mode_t mode)
         case MODE_GRAYSCALE: return "";
         case MODE_RGB:       return "";
         case MODE_UYVY:      return "UYVY";
+        case MODE_JPEG:      return "";
         default:
             throw std::runtime_error("does not know the media type for mode " + boost::lexical_cast<std::string>(mode));
     }
