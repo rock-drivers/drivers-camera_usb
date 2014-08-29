@@ -235,7 +235,10 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
             mCamConfig->writeFPS((uint32_t)value);
             uint32_t cam_fps_tmp = 0;
             mCamConfig->readFPS(&cam_fps_tmp);
-            LOG_WARN("Set (%d) and read (%d) FPS differs, set to %d", (uint32_t)value, cam_fps_tmp, cam_fps_tmp);
+            if((uint32_t)value != cam_fps_tmp) {
+                LOG_WARN("Written (%d) and read (%d) FPS differ, %d will be used", 
+                         (uint32_t)value, cam_fps_tmp, cam_fps_tmp);
+            }
             mFps = cam_fps_tmp;
             break;
         }
@@ -298,11 +301,6 @@ bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
 
 bool CamUsb::isAttribAvail(const int_attrib::CamAttrib attrib) {
     LOG_DEBUG("CamUsb: isAttribAvail int");
-
-    if(attrib == int_attrib::ExposureValue) {
-        LOG_WARN("The current driver version ignores the integer attribute ExposureValue.");
-        return false;
-    }
 
     if(mCamMode != CAM_USB_V4L2) {
         LOG_INFO("Stop image requesting before checking whether an int attribute is available.");
@@ -555,6 +553,19 @@ bool CamUsb::setToDefault() {
     }
 
     mCamConfig->setControlValuesToDefault();
+    return true;
+}
+
+bool CamUsb::printCameraInformations() {
+    if(mCamMode != CAM_USB_V4L2) {
+        LOG_INFO("Stop image requesting before set camera parameters to default.");
+        return false;
+    }
+    printf("\nCAMERA INFORMATIONS\n");
+    mCamConfig->listCapabilities();
+    mCamConfig->listControls();
+    mCamConfig->listImageFormat();
+    mCamConfig->listStreamparm();
     return true;
 }
 

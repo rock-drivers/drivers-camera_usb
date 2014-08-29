@@ -25,6 +25,16 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
     } else {
         LOG_DEBUG("File opened, fd: %d",mFd);
     }
+ 
+    // Collect all relative and absolute controls which 
+    // are only allowed to change in manual-mode (used in readControl()).
+    mAutoManualDependentControlIds.insert(V4L2_CID_WHITE_BALANCE_TEMPERATURE);
+    mAutoManualDependentControlIds.insert(V4L2_CID_GAIN);
+    mAutoManualDependentControlIds.insert(V4L2_CID_HUE);
+    mAutoManualDependentControlIds.insert(V4L2_CID_BRIGHTNESS);
+    mAutoManualDependentControlIds.insert(V4L2_CID_EXPOSURE_ABSOLUTE);
+    mAutoManualDependentControlIds.insert(V4L2_CID_FOCUS_ABSOLUTE);
+    mAutoManualDependentControlIds.insert(V4L2_CID_FOCUS_RELATIVE);
 
     // Catches CamConfigException (not supported functionalities).
     // std::runtime error is passed.
@@ -73,45 +83,47 @@ void CamConfig::readCapability() {
 void CamConfig::listCapabilities() {
     LOG_DEBUG("CamConfig: listCapabilities");
 
-    LOG_INFO("Driver: %s", getCapabilityDriver().c_str());
-    LOG_INFO("Card: %s ", getCapabilityCard().c_str());
-    LOG_INFO("Bus Info: %s", getCapabilityBusInfo().c_str());
-    LOG_INFO("Version: %d", getCapabilityVersion());
+    printf("CAMERA CAPABILITIES\n");
+    printf("Driver: %s\n", getCapabilityDriver().c_str());
+    printf("Card: %s\n", getCapabilityCard().c_str());
+    printf("Bus Info: %s\n", getCapabilityBusInfo().c_str());
+    printf("Version: %d\n", getCapabilityVersion());
 
     uint32_t flag = mCapability.capabilities;
-    LOG_INFO("Capabilities: ");
+    printf("Capabilities: ");
     if(flag & V4L2_CAP_VIDEO_CAPTURE) 
-        LOG_INFO("V4L2_CAP_VIDEO_CAPTURE: The device can capture video data.");
+        printf("V4L2_CAP_VIDEO_CAPTURE: The device can capture video data.\n");
     if(flag & V4L2_CAP_VIDEO_OUTPUT) 
-        LOG_INFO("V4L2_CAP_VIDEO_OUTPUT: The device can perform video output.");
+        printf("V4L2_CAP_VIDEO_OUTPUT: The device can perform video output.\n");
     if(flag & V4L2_CAP_VIDEO_OVERLAY) 
-        LOG_INFO("V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer.");
+        printf("V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer.\n");
     if(flag & V4L2_CAP_VBI_CAPTURE) 
-        LOG_INFO("V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data.");
+        printf("V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data.\n");
     if(flag & V4L2_CAP_VBI_OUTPUT) 
-        LOG_INFO("V4L2_CAP_VBI_OUTPUT: It can do raw VBI output.");
+        printf("V4L2_CAP_VBI_OUTPUT: It can do raw VBI output.\n");
     if(flag & V4L2_CAP_SLICED_VBI_CAPTURE) 
-        LOG_INFO("V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture.");
+        printf("V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture.\n");
     if(flag & V4L2_CAP_SLICED_VBI_OUTPUT) 
-        LOG_INFO("V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output.");
+        printf("V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output.\n");
     if(flag & V4L2_CAP_RDS_CAPTURE) 
-        LOG_INFO("V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data.");
+        printf("V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data.\n");
     if(flag & V4L2_CAP_TUNER) 
-        LOG_INFO("V4L2_CAP_TUNER: It has a computer-controllable tuner.");
+        printf("V4L2_CAP_TUNER: It has a computer-controllable tuner.\n");
     if(flag & V4L2_CAP_AUDIO) 
-        LOG_INFO("V4L2_CAP_AUDIO: It can capture audio data.");
+        printf("V4L2_CAP_AUDIO: It can capture audio data.\n");
     if(flag & V4L2_CAP_RADIO) 
-        LOG_INFO("V4L2_CAP_RADIO: It is a radio device.");
+        printf("V4L2_CAP_RADIO: It is a radio device.\n");
     if(flag & V4L2_CAP_READWRITE) 
-        LOG_INFO("V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" \
+        printf("V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" \
                 " very few devices will support both. It makes little sense to write " \
-                "to a camera, normally.");
+                "to a camera, normally.\n");
     if(flag & V4L2_CAP_ASYNCIO) 
-        LOG_INFO("V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " \
+        printf("V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " \
                 "the V4L2 layer as a whole does not yet support asynchronous I/O, " \
-                "so this capability is not meaningful.");
+                "so this capability is not meaningful.\n");
     if(flag & V4L2_CAP_STREAMING) 
-        LOG_INFO("V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O.");
+        printf("V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O.\n");
+    printf("\n");
 }
 
 std::string CamConfig::getCapabilityDriver() {
@@ -146,7 +158,7 @@ bool CamConfig::hasCapability(uint32_t capability_field) {
         }
     }
     if(!valid) {
-        LOG_DEBUG("Capability flag %d not valid", capability_field);
+        LOG_INFO("Capability flag %d not valid", capability_field);
         return false;
     }
 
@@ -171,7 +183,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_BASE control parameter %d: %s", 
                     i-V4L2_CID_BASE, e.what());
         }
     }
@@ -186,7 +198,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
                     i-V4L2_CID_MPEG_BASE, e.what());
         }
     }
@@ -200,7 +212,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
                     i-V4L2_CID_MPEG_BASE, e.what());
         }
     }
@@ -214,7 +226,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_MPEG_BASE control parameter %d: %s", 
                     i-V4L2_CID_MPEG_BASE, e.what());
         }
     }
@@ -228,7 +240,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_MPEG_CX2341X_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_MPEG_CX2341X_BASE control parameter %d: %s", 
                     i-V4L2_CID_MPEG_CX2341X_BASE, e.what());
         }
     }
@@ -243,7 +255,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_CAMERA_CLASS_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_CAMERA_CLASS_BASE control parameter %d: %s", 
                     i-V4L2_CID_CAMERA_CLASS_BASE, e.what());
         }
     }
@@ -300,7 +312,7 @@ void CamConfig::readControl() {
             readControl(queryctrl_tmp);
         }
         catch (std::runtime_error& e) {
-            LOG_ERROR("Reading V4L2_CID_PRIVATE_BASE control parameter %d: %s", 
+            LOG_WARN("Reading V4L2_CID_PRIVATE_BASE control parameter %d: %s", 
                     i-V4L2_CID_PRIVATE_BASE, e.what());
         }
     }
@@ -316,13 +328,13 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
     if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
         // Control available by the camera (continue if not)?
         if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) {
-            LOG_DEBUG("Control id %d marked as disabled", original_control_id);
+            LOG_INFO("Control id %d marked as disabled", original_control_id);
             return;
         }
 
         // Driver seems not to like the control.
         if (queryctrl_tmp.id != original_control_id) {
-            LOG_DEBUG("Driver has changed the control ID %d, will not be used", original_control_id);
+            LOG_INFO("Driver has changed the control ID %d, will not be used", original_control_id);
             return;
         }
 
@@ -334,8 +346,8 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
         // Flags V4L2_CTRL_FLAG_GRABBED, V4L2_CTRL_FLAG_UPDATE, V4L2_CTRL_FLAG_INACTIVE
         // and V4L2_CTRL_FLAG_SLIDER are ignored at the moment.
         if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_READ_ONLY) {
-            LOG_DEBUG("Control id %d marked as read-only", original_control_id);
-            cam_ctrl.mReadOnly = true;
+            LOG_INFO("Control %s(%d) marked as read-only", cam_ctrl.mCtrl.name, original_control_id);
+            cam_ctrl.mWriteable = false;
             return;
         }
 
@@ -361,34 +373,45 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
                 }
             }
         }
+        
+        // Store CamCtrl using control ID as key. Use returned iterator
+        // to set readable and writeable.
+        std::pair<std::map<uint32_t, struct CamCtrl>::iterator, bool> ret = 
+                mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
+        std::map<uint32_t, struct CamCtrl>::iterator it = ret.first;
 
         // Read and store current value.
         try {
             cam_ctrl.mValue = readControlValue(original_control_id);
         } catch(std::runtime_error& e) {
             // Assuming write-only control (id valid, only write operation should work)
-            LOG_DEBUG("Control ID %d seem to be write-only", original_control_id);
-            cam_ctrl.mWriteOnly = true;
+            LOG_WARN("Control %s (%d) seems not to be readable: %s", 
+                     cam_ctrl.mCtrl.name, original_control_id, e.what());
+            it->second.mReadable = false;
         }
 
         // Try writing the current value back
-        if (!cam_ctrl.mReadOnly)
+        if (it->second.mWriteable)
         {
             try {
-                writeControlValue(original_control_id, cam_ctrl.mValue);
+                writeControlValue(original_control_id, cam_ctrl.mValue, true);
             } catch(std::runtime_error& e) {
                 // Assuming read-only control (id valid, only read operation should work)
-                LOG_DEBUG("Control ID %d seem to be read-only", original_control_id);
-                cam_ctrl.mReadOnly = true;
+                LOG_WARN("Control %s (%d) seems not to be writeable: %s", 
+                         cam_ctrl.mCtrl.name, original_control_id, e.what());
+                
+                // Absolute control values like Exposure or Focus can only be changed
+                // in Manual Mode. They will not be set to not-writeable here.
+                if(mAutoManualDependentControlIds.find(original_control_id) == 
+                        mAutoManualDependentControlIds.end()) { 
+                    it->second.mWriteable = false;
+                }
             }
         }
-
-        // Store CamCtrl using control ID as key.
-        mCamCtrls.insert(std::pair<int32_t,struct CamCtrl>(original_control_id, cam_ctrl));
     } else {
         // Unknown control, will be ignored.
         if (errno == EINVAL) { 
-            LOG_DEBUG("Control ID %d not available and will be ignored", original_control_id);
+            LOG_DEBUG("Control %d not available and will be ignored", original_control_id);
             return;
         }
         std::string err_str(strerror(errno)); 
@@ -397,7 +420,9 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
 }
 
 int32_t CamConfig::readControlValue(uint32_t const id) {
-    LOG_DEBUG("CamConfig: readControlValue %d", id);
+    std::string control_name;
+    getControlName(id, &control_name);
+    LOG_DEBUG("CamConfig: readControlValue %s (%d)", control_name.c_str(), id);
 
     struct v4l2_control control;
     memset(&control, 0, sizeof(struct v4l2_control));
@@ -407,61 +432,78 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
         std::string err_str(strerror(errno)); 
         throw std::runtime_error(err_str.insert(0, "Could not read control object value: ")); 
     }
-    LOG_DEBUG("Control ID 0x%x(%d) value: %d", id, id, control.value);
+    LOG_DEBUG("Control %s(0x%x(%d)) value: %d", control_name.c_str(), id, id, control.value);
     return control.value;
 }
 
-void CamConfig::writeControlValue(uint32_t const id, int32_t value) {
-    LOG_DEBUG("CamConfig: writeControlValue %d to %d", id, value);
+void CamConfig::writeControlValue(uint32_t const id, int32_t value, bool just_write) {
+    std::string control_name;
+    getControlName(id, &control_name);
+    LOG_DEBUG("CamConfig: writeControlValue %s (%d) to %d", control_name.c_str(), id, value);
     struct v4l2_control control;
     control.id = id;
     control.value = value;
 
     // Problem setting control parameter V4L2_CID_WHITE_BALANCE_TEMPERATURE
     // on Microsoft LifeCam Cinema(TM), will be ignored.
+    /* Should be handled by read/write only parameters.
     if(id == V4L2_CID_WHITE_BALANCE_TEMPERATURE) {
         LOG_WARN("Writing of control V4L2_CID_WHITE_BALANCE_TEMPERATURE is ignored!");
         return;
     }
-
-    // Request internally stored control.
+    */
     std::map<uint32_t, struct CamCtrl>::iterator it;
-    it = mCamCtrls.find(id);
+    if(!just_write) { 
+        // Request internally stored control.
+        it = mCamCtrls.find(id);
 
-    // id unknown?
-    if(it == mCamCtrls.end()) {
-        throw std::runtime_error("Passed id unknown");
-    }
+        // id unknown?
+        if(it == mCamCtrls.end()) {
+            throw std::runtime_error("Passed id unknown");
+        }
 
-    // read-only control?
-    if(it->second.mReadOnly) {
-        throw std::runtime_error("Control with the passed id is read-only");
-    }
+        // read-only control?
+        if(!it->second.mWriteable) {
+            std::stringstream ss;
+            ss << "Writing is deactivated for control " << control_name << std::endl;
+            throw std::runtime_error(ss.str().c_str());
+        }
 
-    // Check borders.
-    if(value < it->second.mCtrl.minimum) {
-        LOG_INFO("Control %d value %d set to minimum %d", id, value, it->second.mCtrl.minimum);
-        control.value = it->second.mCtrl.minimum;
-    }
-    if(value > it->second.mCtrl.maximum) {
-        LOG_INFO("Control %d value %d set to maximum %d", id, value, it->second.mCtrl.maximum);
-        control.value = it->second.mCtrl.maximum;
+        // Check borders.
+        if(value < it->second.mCtrl.minimum) {
+            LOG_INFO("Control %s (%d) value %d set to minimum %d", 
+                    control_name.c_str(), id, value, it->second.mCtrl.minimum);
+            control.value = it->second.mCtrl.minimum;
+        }
+        if(value > it->second.mCtrl.maximum) {
+            LOG_INFO("Control %s (%d) value %d set to maximum %d", 
+                    control_name.c_str(), id, value, it->second.mCtrl.maximum);
+            control.value = it->second.mCtrl.maximum;
+        }
     }
 
     if(0 == ioctl (mFd, VIDIOC_S_CTRL, &control)) {
-        // Change internally stored value as well.
-        it->second.mValue = value;
+        if(!just_write) {
+            // Change internally stored value as well.
+            it->second.mValue = value;
+        }
+        LOG_DEBUG("Control value %s (0x%x (%d)) set to %d", control_name.c_str(), id, id, value);
     } else {
         std::string err_str(strerror(errno));
         
         // ID unknown? Should not happen or data would be out of sync.
-        if(errno == EINVAL)
+        if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
                     "VIDIOC_S_CTRL is not supported by device driver: "));
+        }
         
-        throw std::runtime_error(err_str.insert(0, "Could not write control object: ")); 
+        // Some controls may only be changed in manual mode. This is not an error.
+        if(mAutoManualDependentControlIds.find(id) != mAutoManualDependentControlIds.end()) {
+            LOG_WARN("Control value %s (0x%x (%d)) cannot be changed, auto-mode active?", control_name.c_str(), id, id);
+        } else {
+            throw std::runtime_error(err_str.insert(0, "Could not write control object: ")); 
+        }
     }
-    LOG_DEBUG("Control value 0x%x(%d) set to %d", id, id, value);
 }
 
 std::vector<uint32_t> CamConfig::getControlValidIDs() {
@@ -489,29 +531,31 @@ std::vector<struct CamConfig::CamCtrl> CamConfig::getControlList() {
 void CamConfig::listControls() {
     std::map<uint32_t, struct CamCtrl>::iterator it;
 
+    printf("CAMERA CONTROLS\n");
     for(it = mCamCtrls.begin(); it != mCamCtrls.end(); it++) {
         struct v4l2_queryctrl* pq = &(it->second.mCtrl);
         std::string name;
         getControlName(it->first, &name);
-        LOG_INFO("\n\t0x%x(%d): %s, values: %d to %d (step %d), default: %d, current: %d, write-only: %s, read-only: %s\n", 
+        printf("0x%x(%d): %s, values: %d to %d (step %d), default: %d, current: %d, writeable: %s, readable: %s\n", 
             pq->id, pq->id, name.c_str(), pq->minimum, pq->maximum, pq->step, pq->default_value, it->second.mValue,
-            it->second.mWriteOnly ? "true" : "false", it->second.mReadOnly ? "true" : "false");
+            it->second.mWriteable ? "true" : "false", it->second.mReadable ? "true" : "false");
         if(it->second.mMenuItems.size() > 0) {
-            LOG_INFO("Menu-Entries");
+            printf("\tMenu-Entries\n");
         }
         for(unsigned int i=0; i < it->second.mMenuItems.size(); i++) {
-            LOG_INFO("%d: %s", i, it->second.mMenuItems[i].c_str());
+            printf("\t%d: %s\n", i, it->second.mMenuItems[i].c_str());
         }
-    }       
+    }  
+    printf("\n");
 }
 
 bool CamConfig::isControlIdValid(uint32_t const id) const {
     std::map<uint32_t, CamCtrl>::const_iterator it = mCamCtrls.find(id);
-    return (it != mCamCtrls.end()) && !(it->second.mReadOnly);
+    return (it != mCamCtrls.end()) && (it->second.mWriteable);
 }
 
 bool CamConfig::isControlIdWritable(uint32_t const id) const {
-    return isControlIdValid(id) && !mCamCtrls.find(id)->second.mReadOnly;
+    return isControlIdValid(id) && mCamCtrls.find(id)->second.mWriteable;
 }
 
 bool CamConfig::getControlValue(uint32_t const id, int32_t* value) {
@@ -697,15 +741,18 @@ void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const heigh
 }
 
 void CamConfig::listImageFormat() {
+    
+    printf("CAMERA IMAGE FORMATS\n");
     std::string pixelformat_str;
     getImagePixelformatString(&pixelformat_str);
-    LOG_INFO("Image width: %d", mFormat.fmt.pix.width);
-    LOG_INFO("Image height: %d", mFormat.fmt.pix.height);
-    LOG_INFO("Image pixelformat: %s", pixelformat_str.c_str());
-    LOG_INFO("Image field: %d", mFormat.fmt.pix.field);
-    LOG_INFO("Image bytesperline: %d", mFormat.fmt.pix.bytesperline);
-    LOG_INFO("Image sizeimage: %d", mFormat.fmt.pix.sizeimage);
-    LOG_INFO("Image colorspace: %d", mFormat.fmt.pix.colorspace);
+    printf("Image width: %d\n", mFormat.fmt.pix.width);
+    printf("Image height: %d\n", mFormat.fmt.pix.height);
+    printf("Image pixelformat: %s\n", pixelformat_str.c_str());
+    printf("Image field: %d\n", mFormat.fmt.pix.field);
+    printf("Image bytesperline: %d\n", mFormat.fmt.pix.bytesperline);
+    printf("Image sizeimage: %d\n", mFormat.fmt.pix.sizeimage);
+    printf("Image colorspace: %d\n", mFormat.fmt.pix.colorspace);
+    printf("\n");
 }
 
 bool CamConfig::getImageWidth(uint32_t* width) {
@@ -848,30 +895,32 @@ void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denomin
 }
 
 void CamConfig::listStreamparm() {
-    LOG_INFO("Capabilities: ");
+    printf("CAMERA STREAM PARAMETERS\n");
+    printf("Capabilities:\n");
     uint32_t flag = mStreamparm.parm.capture.capability;
     if(flag & V4L2_CAP_TIMEPERFRAME) {
-        LOG_INFO("V4L2_CAP_TIMEPERFRAME: The frame skipping/repeating " \
-                "controlled by the timeperframe field is supported.");
+        printf("V4L2_CAP_TIMEPERFRAME: The frame skipping/repeating " \
+                "controlled by the timeperframe field is supported.\n");
     }
 
-    LOG_INFO("Capturemodes: ");
+    printf("Capturemodes:\n");
     flag = mStreamparm.parm.capture.capturemode;
     if(flag & V4L2_MODE_HIGHQUALITY) {
-        LOG_INFO("V4L2_MODE_HIGHQUALITY: High quality imaging mode.");
+        printf("V4L2_MODE_HIGHQUALITY: High quality imaging mode.\n");
     }
-    LOG_INFO("Capturemode: %d", mStreamparm.parm.capture.capturemode);
+    printf("Capturemode: %d\n", mStreamparm.parm.capture.capturemode);
 
-    LOG_INFO("Timeperframe: %d/%d", mStreamparm.parm.capture.timeperframe.numerator,
+    printf("Timeperframe: %d/%d\n", mStreamparm.parm.capture.timeperframe.numerator,
             mStreamparm.parm.capture.timeperframe.denominator);
 
     uint32_t extendedmode = mStreamparm.parm.capture.extendedmode;
     std::string ext_str = extendedmode == 0 ? " (unused)" : "";
-    LOG_INFO("Extendedmode: %d%s", extendedmode, ext_str.c_str());
+    printf("Extendedmode: %d%s\n", extendedmode, ext_str.c_str());
 
     uint32_t readbuffers = mStreamparm.parm.capture.readbuffers;       
     std::string read_str = readbuffers == 0 ? " Should not be zero!" : "";
-    LOG_INFO("Readbuffers: %d%s", readbuffers, read_str.c_str());
+    printf("Readbuffers: %d%s\n", readbuffers, read_str.c_str());
+    printf("\n");
 }
 
 bool CamConfig::readFPS(uint32_t* fps) {

@@ -254,6 +254,11 @@ class CamUsb : public CamInterface {
      * The connection to the camera has to be closed.
      */
     virtual bool setToDefault();
+    
+    /**
+     * List all camera informations. BASE_LOG_LEVEL has to be set to INFO.
+     */
+    bool printCameraInformations();
 
     //virtual bool setFrameToCameraFrameSettings(base::samples::frame::Frame &frame);
 

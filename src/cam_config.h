@@ -35,6 +35,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <set>
 
 #include <base/logging.h>
 
@@ -65,7 +66,7 @@ class CamConfig
     struct CamCtrl {
      public:
         CamCtrl() : mCtrl(), mMenuItems(), mValue(0), 
-                mWriteOnly(false), mReadOnly(false) {
+                mWriteable(true), mReadable(true) {
             memset(&mCtrl, 0, sizeof(struct v4l2_queryctrl));
         }        
         
@@ -75,8 +76,8 @@ class CamConfig
         struct v4l2_queryctrl mCtrl;
         std::vector<std::string> mMenuItems;
         int32_t mValue;
-        bool mWriteOnly; // Above values are set to zero.
-        bool mReadOnly;
+        bool mWriteable; // Above values are set to zero.
+        bool mReadable;
     }; 
 
  public: // CAMCONFIG
@@ -143,8 +144,11 @@ class CamConfig
      * The passed id and value have to be valid, otherwise a runtime_error is thrown.
      * V4L2_CID_WHITE_BALANCE_TEMPERATURE can not be set (at least on the test camera
      * Microsoft LifeCam Cinema(TM), therefore this parameter is ignored at the moment. 
+     * \param just_write If set to true, the passed control value will just be written
+     * (without any checks and without storing the new value in 'mCamCtrls').
+     * This is used to test whether the control is writeable.
      */
-    void writeControlValue(uint32_t const id, int32_t value);
+    void writeControlValue(uint32_t const id, int32_t value, bool just_write=false);
 
     /**
      * Returns list of valid control IDs.
@@ -297,6 +301,10 @@ class CamConfig
     struct v4l2_format mFormat;
     // Stream
     struct v4l2_streamparm mStreamparm;
+    // Used to collect all controls depending on another control.
+    // E.g. V4L2_CID_FOCUS_ABSOLUTE and V4L2_CID_FOCUS_RELATIVE can only be changed
+    // if V4L2_CID_FOCUS_AUTO is set to 0 (manual).
+    std::set<uint32_t> mAutoManualDependentControlIds;
 
     CamConfig() {}
 
