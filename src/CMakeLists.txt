@@ -5,4 +5,4 @@ rock_library(camera_usb
     DEPS_PKGCONFIG gstreamer-0.10 gstreamer-plugins-base-0.10 gstreamer-app-0.10
 )
 
-add_subdirectory(tests)
+#add_subdirectory(tests)
