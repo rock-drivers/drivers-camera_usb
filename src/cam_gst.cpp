@@ -110,12 +110,24 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
     gst_bus_add_watch (mGstPipelineBus, callbackMessagesStatic, this);  
 
     GstElement* cap = 0;
-    // Add elements to pipeline.
-    cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
-    gst_bin_add_many (GST_BIN (mPipeline), source, cap, sink, (void*)NULL);
-    if (!gst_element_link_many (source, cap, sink, (void*)NULL)) {
-        throw CamGstException("Failed to link default pipeline!");
-    } 
+    if (image_mode == MODE_JPEG)
+    {
+        cap = createDefaultCap(width, height, fps, bpp, MODE_UNDEFINED); // format
+        LOG_INFO("CamGst: creating default (jpeg) encoder with quality: %d", jpeg_quality);
+        GstElement* encoder = createDefaultEncoder(jpeg_quality);
+        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, encoder, sink, (void*)NULL);
+        if (!gst_element_link_many (source, colorspace, cap, encoder, sink, (void*)NULL)) {
+            throw CamGstException("Failed to link default pipeline!");
+        }
+    }
+    else
+    {
+        cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
+        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
+        if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
+            throw CamGstException("Failed to link default pipeline!");
+        }
+    }
 }
 
 void CamGst::deletePipeline() {
@@ -390,23 +402,13 @@ GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height
 
 // mode to 1 - streaming?
 GstElement* CamGst::createDefaultEncoder(int32_t const jpeg_quality) {
-    GstElementFactory* factory = gst_element_factory_find ("dspjpegenc");
-    GstElement* element = NULL;
-    if(factory != NULL) {
-    LOG_DEBUG("createDefaultEncoder dspjpegenc, jpeg_quality: %d", jpeg_quality);
-        element = gst_element_factory_create (factory, "default_encoder");
-        g_object_set (G_OBJECT (element), 
-            "mode", 1, 
-            (void*)NULL);
-    } else {
-        LOG_DEBUG("createDefaultEncoder jpegenc, jpeg_quality: %d", jpeg_quality);
-        element = gst_element_factory_make ("jpegenc", "default_encoder");
-        g_object_set (G_OBJECT (element), 
-            "quality", jpeg_quality, 
-            (void*)NULL);
-    }
+    LOG_DEBUG("CamGst: createDefaultEncoder jpegenc, jpeg_quality: %d", jpeg_quality);
+    GstElement* element = gst_element_factory_make ("jpegenc", "default_encoder");
     if(element == NULL)
         throw CamGstException("Default encoder could not be created.");
+    g_object_set (G_OBJECT (element),
+        "quality", jpeg_quality,
+        (void*)NULL);
 
     return element;
 }
