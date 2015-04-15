@@ -1,11 +1,12 @@
-#define BOOST_TEST_MODULE unittest
-#include <boost/test/included/unit_test.hpp>
+//#define BOOST_TEST_MODULE unittest
+#include <boost/test/unit_test.hpp>
 
-// Always use only one test suite, otherwise the device will become blocked.
-//#include "v4l2_test.h"
-//#include "gst_test.h"
-//#include "usb_test.h"
+//BOOST_AUTO_TEST_SUITE(camera_usb__test_suite)
+
+#include "v4l2_test.h"
+#include "gst_test.h"
 #include "restart_test.h"
+#include "usb_test.h"
 
 // You can use the following setups: 
 // BOOST_CHECK_MESSAGE(1 == 1, "Send test sucessfully");
@@ -20,3 +21,5 @@
 // BOOST_TEST_MESSAGE
 // BOOST_REQUIRE_NO_THROW
 // BOOST_REQUIRE_THROW
+
+//BOOST_AUTO_TEST_SUITE_END()

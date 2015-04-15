@@ -11,12 +11,12 @@
  * \author  Stefan.Haase@dfki.de
  */
 
-#ifndef _USB_TEST_H_
-#define _USB_TEST_H_
+#ifndef _RESTART_TEST_H_
+#define _RESTART_TEST_H_
 
 #include "camera_usb/cam_usb.h"
 
-BOOST_AUTO_TEST_SUITE(restart_test_suite)
+
 
 /** Collected errors: 
  * - terminate called after throwing an instance of 'std::length_error' what():  basic_string::_S_create
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(restart_test) {
     base::samples::frame::frame_size_t size(640,480);
     BOOST_CHECK(usb.setFrameSettings(size, base::samples::frame::MODE_JPEG, 3));
      
-    for(int i=0; i < 100; i++) {   
+    for(int i=0; i < 10; i++) {   
         std::cout << "START GRABBING " << i << std::endl;
         BOOST_CHECK(usb.grab(camera::SingleFrame) == true);
         std::cout << "RETRIEVE FRAME " << i << std::endl;
@@ -65,6 +65,6 @@ BOOST_AUTO_TEST_CASE(restart_test) {
     }
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+
 
 #endif

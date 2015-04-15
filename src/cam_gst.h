@@ -75,10 +75,10 @@ class CamGst {
      * convert the image to jpeg and write the result to a buffer.
      * dspjpegenc is used if available (Gumstix), otherwise jpegenc.
      * Always use the device passed to the constructor.
-     * \param check_for_valid_params If set to true the parameters are validated.
+     * \param check_for_valid_params If set to true the parameters (width, height, fps) are validated.
      * If they are not valid on the camera valid parameters are used. In addition if you 
      * pass 0 for a parameter, the last valid parameter on the camera will be used.  
-     * E.g. 'createDefaultPipeline(0,0,0,80)' would just change the JPEG quality.
+     * E.g. 'createDefaultPipeline(true,0,0,0,80)' would just change the JPEG quality.
      * But for this functionality a CamConfig object has to be created, which uses 
      * the same device like GStreamer what should be avoided.
      * In addition using this method within the CamUsb driver is not necessary because
@@ -86,13 +86,13 @@ class CamGst {
      * If set to false the pipeline may not be created if the parameters are not supported by
      * the camera (a CamGstException may be thrown).
      */
-    void createDefaultPipeline(uint32_t width = DEFAULT_WIDTH, 
+    void createDefaultPipeline(bool check_for_valid_params=false,
+            uint32_t width = DEFAULT_WIDTH, 
             uint32_t height = DEFAULT_HEIGHT, 
             uint32_t fps = DEFAULT_FPS,
-	    uint32_t bpp = DEFAULT_BPP,
-	    base::samples::frame::frame_mode_t mode = base::samples::frame::MODE_UNDEFINED,
-            uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY,
-            bool check_for_valid_params=false);
+            uint32_t bpp = DEFAULT_BPP,
+            base::samples::frame::frame_mode_t mode = base::samples::frame::MODE_UNDEFINED,
+            uint32_t jpeg_quality = DEFAULT_JPEG_QUALITY);
 
     /**
      * Deletes pipeline, clears buffer.
@@ -117,9 +117,7 @@ class CamGst {
 
     /**
      * Allows to request a copy of the new image.
-     * \param buffer Will be set to the new image or NULL if no new image is available.
-     * \warning Take care to free the returned image!
-     * \param buf_size Will get the image size or 0 if no image is available.
+     * \param buffer Will receive the image if available.
      * \param blocking_read If true, method will return as soon as a new image is available. 
      * \param timeout Max. time to wait for the frame in msec. < 1 means no timeout.
      * \return blocking-read not active: true if a new image is available, otherwise false. \n

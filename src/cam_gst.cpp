@@ -78,9 +78,10 @@ void CamGst::printElementFactories() {
     g_print("ELEMENT FACTORIES END ###################################################################\n");
 }
 
-void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps, 
+void CamGst::createDefaultPipeline(bool check_for_valid_params, 
+        uint32_t width, uint32_t height, uint32_t fps, 
         uint32_t bpp, frame_mode_t image_mode,
-        uint32_t jpeg_quality, bool check_for_valid_params) {
+        uint32_t jpeg_quality) {
     LOG_DEBUG("CamGst: createDefaultPipeline");
     deletePipeline();
 
@@ -92,12 +93,16 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
 
     GstElement* source = createDefaultSource(mDevice);
     GstElement* colorspace  = gst_element_factory_make("ffmpegcolorspace", "colorspace");
-    if(colorspace == NULL)
+    if(colorspace == NULL) {
+        deletePipeline();
         throw CamGstException("Colorspace convertion element could not be created");
+    }
+    
     GstElement* sink = createDefaultSink();
     mSource = source;
 
     if((mPipeline = gst_pipeline_new ("default_pipeline")) == NULL) {
+        deletePipeline();
         throw CamGstException("Default pipeline could not be created.");    
     }
 
@@ -117,6 +122,7 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
         GstElement* encoder = createDefaultEncoder(jpeg_quality);
         gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, encoder, sink, (void*)NULL);
         if (!gst_element_link_many (source, colorspace, cap, encoder, sink, (void*)NULL)) {
+            deletePipeline();
             throw CamGstException("Failed to link default pipeline!");
         }
     }
@@ -125,6 +131,7 @@ void CamGst::createDefaultPipeline(uint32_t width, uint32_t height, uint32_t fps
         cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
         gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
         if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
+            deletePipeline();
             throw CamGstException("Failed to link default pipeline!");
         }
     }

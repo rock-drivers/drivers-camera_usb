@@ -118,7 +118,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
         case Continuously: {
             changeCameraMode(CAM_USB_GST);
              // If one of the parameters is 0, the current setting of the camera is used.
-            mCamGst->createDefaultPipeline(
+            mCamGst->createDefaultPipeline(true,
                     image_size_.width, image_size_.height,
                     (uint32_t)mFps, (uint32_t)mBpp,
                     image_mode_);

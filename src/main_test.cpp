@@ -26,10 +26,12 @@ void printImageRequestingMenu() {
 }
 
 int getRequest(int start, int stop) {
-    int value = 0;
+    int value = 0;;
     while(value < start || value > stop) {
         std::cout << "Choose (" << start << " - " << stop << "): ";
-        scanf("%d", &value);
+        if(scanf("%d", &value) != 1) {
+            std::cout << "Reading error" << std::endl;
+        }
     }
     return value;
 }
@@ -70,7 +72,7 @@ int main(int argc, char* argv[])
                     case 2: {
                         cam_menu = IMAGE_REQUESTING;
                         cam_gst = new CamGst(device);
-                        cam_gst->createDefaultPipeline(640, 480, 10, 80);
+                        cam_gst->createDefaultPipeline(true, 640, 480, 10, 80);
                         cam_gst->startPipeline();
                         break;
                     }
@@ -118,11 +120,15 @@ int main(int argc, char* argv[])
                 ret = getRequest(1, 3);
                 switch(ret) {
                     case 1: {
+                        cam_gst->createDefaultPipeline(true, 0, 0, 0, 24, base::samples::frame::MODE_JPEG, 80);
+                        cam_gst->startPipeline();
                         if(!cam_gst->getBuffer(buffer, true, 2000)) {
                             std::cout << "Image could not be requested" << std::endl;
                         } else {
                             std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
                         }
+                        cam_gst->stopPipeline();
+                        cam_gst->deletePipeline();
                         break;
                     }
                     case 2: {

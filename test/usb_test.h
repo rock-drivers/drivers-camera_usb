@@ -16,8 +16,6 @@
 
 #include "camera_usb/cam_usb.h"
 
-BOOST_AUTO_TEST_SUITE(usb_test_suite)
-
 camera::CamUsb usb("/dev/video0");
 std::vector<camera::CamInfo> cam_infos;
 
@@ -142,16 +140,16 @@ BOOST_AUTO_TEST_CASE(work_with_v4l2_controls_directly) {
     std::cout << "WORK WITH V4L2 DIRECTLY" << std::endl;
 
     int control_id = V4L2_CID_BRIGHTNESS;
-    int value = 0;
+    int value = -1;
 
     if(usb.isV4L2AttribAvail(control_id)) {
-        BOOST_CHECK((value = usb.getV4L2Attrib(control_id)));
+        value = usb.getV4L2Attrib(control_id);
+        BOOST_CHECK(value != -1);
 
         std::cout << "Set control id " << control_id << " to " << value << std::endl;
         BOOST_CHECK(usb.setV4L2Attrib(control_id,value));
     }
 }
 
-BOOST_AUTO_TEST_SUITE_END()
 
 #endif

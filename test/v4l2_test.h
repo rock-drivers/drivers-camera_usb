@@ -17,11 +17,10 @@
 #include "camera_usb/cam_config.h"
 
 #include <map>
+#include <iostream>
 #include <string>
 
-BOOST_AUTO_TEST_SUITE(v4l2_test_suite)
-
-#if 0
+#if 1
 int fd = 0;
 
 BOOST_AUTO_TEST_CASE(open_camera_video)
@@ -130,7 +129,7 @@ BOOST_AUTO_TEST_CASE(read_controls)
     memset (&queryctrl, 0, sizeof (struct v4l2_queryctrl));
     valid_ids.clear();
 
-    for (int j = V4L2_CID_BASE; 
+    for (unsigned int j = V4L2_CID_BASE; 
             j < V4L2_CID_LASTP1;
             j++) {
         queryctrl.id = j;
@@ -335,7 +334,7 @@ BOOST_AUTO_TEST_CASE(control_test)
     //uint32_t unknown_flag = 0x0003;
     uint32_t known_flag = V4L2_CTRL_FLAG_READ_ONLY;
 
-    enum v4l2_ctrl_type type;
+    uint32_t type;
     std::string name;
     int32_t minimum;
     int32_t maximum;
@@ -434,7 +433,5 @@ BOOST_AUTO_TEST_CASE(stream_test)
 BOOST_AUTO_TEST_CASE(close_cam_config) {
     delete cam_config;  
 } 
-
-BOOST_AUTO_TEST_SUITE_END()
 
 #endif

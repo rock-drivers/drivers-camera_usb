@@ -5,4 +5,7 @@ rock_library(camera_usb
     DEPS_PKGCONFIG gstreamer-0.10 gstreamer-plugins-base-0.10 gstreamer-app-0.10
 )
 
-#add_subdirectory(tests)
+rock_executable(camera_usb_control 
+    SOURCES main_test.cpp
+    DEPS_PKGCONFIG base-lib camera_interface opencv
+    DEPS camera_usb)
