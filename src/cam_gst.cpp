@@ -115,15 +115,14 @@ void CamGst::createDefaultPipeline(bool check_for_valid_params,
     gst_bus_add_watch (mGstPipelineBus, callbackMessagesStatic, this);  
 
     GstElement* cap = 0;
+   
     if (image_mode == MODE_JPEG)
     {
-        cap = createDefaultCap(width, height, fps, bpp, MODE_UNDEFINED); // format
-        LOG_INFO("CamGst: creating default (jpeg) encoder with quality: %d", jpeg_quality);
-        GstElement* encoder = createDefaultEncoder(jpeg_quality);
-        gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, encoder, sink, (void*)NULL);
-        if (!gst_element_link_many (source, colorspace, cap, encoder, sink, (void*)NULL)) {
+        cap = createDefaultCap(width, height, fps, bpp, MODE_JPEG); // format
+        gst_bin_add_many (GST_BIN (mPipeline), source,  cap,  sink, (void*)NULL);
+        if (!gst_element_link_many (source,  cap, sink, (void*)NULL)) {
             deletePipeline();
-            throw CamGstException("Failed to link default pipeline!");
+            throw CamGstException("Failed to link jpeg pipeline, try another image mode");
         }
     }
     else
@@ -132,7 +131,7 @@ void CamGst::createDefaultPipeline(bool check_for_valid_params,
         gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
         if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
             deletePipeline();
-            throw CamGstException("Failed to link default pipeline!");
+            throw CamGstException("Failed to link default pipeline, try another image mode");
         }
     }
 }

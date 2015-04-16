@@ -151,14 +151,22 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
         return false;
     }
 
-    frame.init(image_size_.width, image_size_.height, 8, image_mode_, 0);
     // Write directly to the frame buffer.
-    bool success = mCamGst->getBuffer(frame.image, true, timeout);
+    std::vector<uint8_t> buffer_tmp;
+    bool success = mCamGst->getBuffer(buffer_tmp, true, timeout);
     if(!success) {
         LOG_ERROR("Buffer could not retrieved.");
         return false;
     }
 
+    // TODO In Frame.hpp getChannelCount() returns 1 for UYVY, should be 2?
+    int depth = 8;
+    if(image_mode_ == base::samples::frame::MODE_UYVY) {
+        depth = 16;
+    }
+
+    frame.init(image_size_.width, image_size_.height, depth, image_mode_, -1, buffer_tmp.size());
+    frame.image = buffer_tmp;
     frame.frame_status = base::samples::frame::STATUS_VALID;
     frame.time = base::Time::now();
 

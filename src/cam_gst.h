@@ -71,10 +71,7 @@ class CamGst {
     ~CamGst();
 
     /**
-     * Creates a simple pipeline to read video/x-raw-yuv I420 images,
-     * convert the image to jpeg and write the result to a buffer.
-     * dspjpegenc is used if available (Gumstix), otherwise jpegenc.
-     * Always use the device passed to the constructor.
+     * Creates a simple pipeline to write images with the requested format to a buffer.
      * \param check_for_valid_params If set to true the parameters (width, height, fps) are validated.
      * If they are not valid on the camera valid parameters are used. In addition if you 
      * pass 0 for a parameter, the last valid parameter on the camera will be used.  
@@ -85,6 +82,9 @@ class CamGst {
      * all parameters have been validated and set already.\n
      * If set to false the pipeline may not be created if the parameters are not supported by
      * the camera (a CamGstException may be thrown).
+     * \param mode Valid modes: MODE_GRAYSCALE, MODE_RGB, MODE_UYVY, MODE_JPEG. 
+     * If MODE_UNDEFINED is passed the raw image video/x-raw-yuv will be requested.
+     * \return If an error occurs a CamGstException is thrown.
      */
     void createDefaultPipeline(bool check_for_valid_params=false,
             uint32_t width = DEFAULT_WIDTH, 
@@ -174,6 +174,9 @@ class CamGst {
 
     GstElement* createDefaultCap(uint32_t const width, uint32_t const height, uint32_t const fps, uint32_t bpp, base::samples::frame::frame_mode_t mode );
 
+    /**
+     * Currently not used anymore, instead the encoding of the camera base class is used.
+     */
     GstElement* createDefaultEncoder(int32_t const jpeg_quality);
 
     GstElement* createDefaultSink();
