@@ -15,11 +15,9 @@
 #ifndef _CAM_GST_CONFIG_H_
 #define _CAM_GST_CONFIG_H_
 
-extern "C" {
 #include <glib.h>
 #include <gst/app/gstappsink.h>
 #include <gst/gst.h>
-}
 
 #include <pthread.h>
 #include <stdio.h>
