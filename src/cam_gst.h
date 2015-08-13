@@ -238,6 +238,8 @@ class CamGst {
 
     GstElement* mSource; // Used to request the fd.
     int mFileDescriptor; // File descriptor of the pipeline source. -1 if not available.
+    
+    base::samples::frame::frame_mode_t mRequestedFrameMode;
 
     /**
      * Using GstGuard to making sure that GStreamer is initialized/deinitialized only once, i.e. use

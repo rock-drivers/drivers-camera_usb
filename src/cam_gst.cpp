@@ -30,7 +30,8 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mBufferSize(0),
         mNewBuffer(false),
         mSource(NULL),
-        mFileDescriptor(-1)
+        mFileDescriptor(-1),
+        mRequestedFrameMode(MODE_UNDEFINED)
 {
     LOG_DEBUG("CamGst: constructor");
     // gst_is_initialized() not available (since 0.10.31), 
@@ -116,9 +117,9 @@ void CamGst::createDefaultPipeline(bool check_for_valid_params,
 
     GstElement* cap = 0;
    
+    cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
     if (image_mode == MODE_JPEG)
     {
-        cap = createDefaultCap(width, height, fps, bpp, MODE_JPEG); // format
         gst_bin_add_many (GST_BIN (mPipeline), source,  cap,  sink, (void*)NULL);
         if (!gst_element_link_many (source,  cap, sink, (void*)NULL)) {
             deletePipeline();
@@ -127,13 +128,15 @@ void CamGst::createDefaultPipeline(bool check_for_valid_params,
     }
     else
     {
-        cap = createDefaultCap(width, height, fps, bpp, image_mode); // format
         gst_bin_add_many (GST_BIN (mPipeline), source, colorspace, cap, sink, (void*)NULL);
         if (!gst_element_link_many (source, colorspace, cap, sink, (void*)NULL)) {
             deletePipeline();
             throw CamGstException("Failed to link default pipeline, try another image mode");
         }
     }
+    
+    // Required to check if the image is a JPEG within getBuffer() (for header adaptions).
+    mRequestedFrameMode = image_mode;
 }
 
 void CamGst::deletePipeline() {
@@ -251,6 +254,29 @@ bool CamGst::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read,
             // Copy buffer for return.
             buffer.resize(mBufferSize);
             memcpy(&buffer[0], GST_BUFFER_DATA(mBuffer), mBufferSize);
+            
+            // Little Hack: Someone (OpenCV?) does not understand JPEG comment-blocks.
+            // Removes comment block to avoid getting 
+            // 'Corrupt JPEG data: x extraneous bytes before marker 0xe0.'
+            if(mRequestedFrameMode == MODE_JPEG) {
+                std::vector<uint8_t>::iterator it = buffer.begin();
+                std::vector<uint8_t>::iterator it_n = buffer.begin() + 1;
+                for(; it_n != buffer.end(); it++, it_n++) {
+                    if(*it == 0xFF && *it_n == 0xFE) {
+                        size_t old_length = *(it+2)<<8 | *(it_n+2);
+                        // e.g. empty comment block: FF FE 00 02 XX
+                        //                           it          it+4
+                        buffer.erase(it, it + (2 + old_length)); 
+                        break;
+                    }
+                    
+                    // Start of scan, no comment block found.
+                    if(*it == 0xFF && *it_n == 0XDA) {
+                        break;
+                    }
+                }
+            }
+ 
             mNewBuffer = false;
             pthread_mutex_unlock(&mMutexBuffer);
             blocking_read = false; // Done, return true.
@@ -381,8 +407,9 @@ GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height
         media_type = toGstreamerMediaType(image_mode);
         fourcc     = toGstreamerFourCC(image_mode);
     }
-    if (image_mode == MODE_GRAYSCALE)
+    if (image_mode == MODE_GRAYSCALE) {
         bpp = 8;
+    }
 
     GstCaps* caps = gst_caps_new_simple (media_type.c_str(),
             "width", G_TYPE_INT, width,
