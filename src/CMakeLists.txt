@@ -4,6 +4,7 @@ rock_library(camera_usb
     DEPS_PKGCONFIG base-lib camera_interface 
     DEPS_PKGCONFIG gstreamer-0.10 gstreamer-plugins-base-0.10 gstreamer-app-0.10
 )
+target_link_libraries(camera_usb pthread)
 
 rock_executable(camera_usb_control 
     SOURCES main_test.cpp
