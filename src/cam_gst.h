@@ -28,7 +28,7 @@
 #include <iostream>
 
 #include "cam_config.h"
-#include <base/samples/frame.h>
+#include <base/samples/Frame.hpp>
 
 namespace camera 
 {
