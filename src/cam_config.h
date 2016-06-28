@@ -37,7 +37,7 @@
 #include <vector>
 #include <set>
 
-#include <base/logging.h>
+#include <base-logging/Logging.hpp>
 
 namespace camera 
 {
