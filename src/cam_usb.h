@@ -43,8 +43,11 @@ namespace camera
  * 4. Call setFrameSettings() to define the image size. 
  * 5. (optional) Use 'setAttrib()' to change default attributes of the camera interface and 
  *    'setV4L2Attrib()' to change special private attributes of the camera not defined by the interface.
- * 6. Call 'grab()' to create and start the GStreamer pipeline (switching from configuration mode to
- *    image requesting mode -> for further configuration the pipeline has to be stopped again).
+ * 6. Call 'grab()' to create and start the image requesting. If the camera mode camera::MultiFrame or
+ *    camera::Continuously is used GStreamer is used for the image requesting. In mode::SingleFrame
+ *    v4l2 is directly used to request the camera images which should be stressfull for the 
+ *    usb bus. To stop the image requesting and enter the configuration mode again mode::Stop
+ *    has been passed.
  * 7. Use 'retrieveFrame()' to get a Frame.
  *
  * You can use 'fastInit(width, height)' for the steps 2, 3 and 4.
@@ -303,11 +306,11 @@ class CamUsb : public CamInterface {
     inline enum CAM_USB_MODE getCamMode() {
         return mCamMode;
     }
-
- private:
-    CamUsb(){};
-
+    
     double calculateFPS() {
+        if(act_grab_mode_ == Stop) {
+            return 0;
+        }
         timeval stop_time_grabbing;
         gettimeofday(&stop_time_grabbing, 0);
         double sec = stop_time_grabbing.tv_sec - mStartTimeGrabbing.tv_sec;
@@ -316,6 +319,9 @@ class CamUsb : public CamInterface {
         else
             return mReceivedFrameCounter / sec;
     }
+
+ private:
+    CamUsb(){};
 
     enum CAM_USB_MODE mCamMode;
 

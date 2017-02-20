@@ -1,5 +1,7 @@
 #include "cam_usb.h"
 
+#include "helpers.h"
+
 namespace camera 
 {
 
@@ -108,12 +110,21 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
         }
     }
 
+    bool image_request_started = false;
     switch(mode) {
         case Stop:
+            if(mCamMode == CAM_USB_V4L2) {
+                // Cleanup will only be exectued if initRequesting() has be called previously.
+                mCamConfig->cleanupRequesting();
+            }
             changeCameraMode(CAM_USB_V4L2);
             act_grab_mode_ = mode;
             break;
-        case SingleFrame:
+        case SingleFrame: { // v4l2 image requesting
+            changeCameraMode(CAM_USB_V4L2);
+            mCamConfig->initRequesting();
+            image_request_started = true;
+        }
         case MultiFrame:
         case Continuously: {
             changeCameraMode(CAM_USB_GST);
@@ -122,17 +133,17 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
                     image_size_.width, image_size_.height,
                     (uint32_t)mFps, (uint32_t)mBpp,
                     image_mode_);
-            bool pipeline_started = false;
-            pipeline_started = mCamGst->startPipeline();
+            
+            image_request_started = mCamGst->startPipeline();
             mReceivedFrameCounter = 0;
-            if(pipeline_started) {
-                gettimeofday(&mStartTimeGrabbing, 0);
-            }
             act_grab_mode_ = mode;
-            return pipeline_started;
         }
         default: 
             throw std::runtime_error("The grab mode is not supported by the camera!");
+    }
+    
+    if(image_request_started) {
+        gettimeofday(&mStartTimeGrabbing, 0);
     }
 
     return true;
@@ -141,34 +152,51 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
 bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout) {
     LOG_DEBUG("CamUsb: retrieveFrame");
 
-    if(mCamMode != CAM_USB_GST) {
+    if(mCamMode == CAM_USB_NONE) {
         LOG_INFO("Frame can not be retrieved, current camera mode is %d", mCamMode);
         return false;
     }
-
-    if(!mCamGst->isPipelineRunning()) {
-        LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
-        return false;
-    }
-
-    // Write directly to the frame buffer.
+    
+    // Buffer will be resized in getBuffer.
     std::vector<uint8_t> buffer_tmp;
-    bool success = mCamGst->getBuffer(buffer_tmp, true, timeout);
-    if(!success) {
-        LOG_ERROR("Buffer could not retrieved.");
-        return false;
+    
+    // Either v4l2 calls are used to retrieve single images or the gstreamer pipeline.
+    // The initialization/cleanup for both methods happens in the grab() function.
+    if(mCamMode == CAM_USB_V4L2) {
+        try {
+            mCamConfig->getBuffer(buffer_tmp, true, timeout);
+        } catch(std::runtime_error& e) {
+            LOG_ERROR("v4l2: Buffer could not be requested: %s", e.what());
+            return false;
+        }   
+    } else if(mCamMode == CAM_USB_GST) {
+        
+        if(!mCamGst->isPipelineRunning()) {
+            LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
+            return false;
+        }
+        bool success = mCamGst->getBuffer(buffer_tmp, true, timeout);
+        if(!success) {
+            LOG_ERROR("Gstreamer: Buffer could not retrieved.");
+            return false;
+        }
     }
-
+    
     // TODO In Frame.hpp getChannelCount() returns 1 for UYVY, should be 2?
     int depth = 8;
     if(image_mode_ == base::samples::frame::MODE_UYVY) {
         depth = 16;
     }
 
+    // Only reallocates if required.
     frame.init(image_size_.width, image_size_.height, depth, image_mode_, -1, buffer_tmp.size());
+    // Can we directly write to the frame buffer?
     frame.image = buffer_tmp;
     frame.frame_status = base::samples::frame::STATUS_VALID;
     frame.time = base::Time::now();
+    
+    // Removes the JPEG comment block if required.
+    Helpers::removeJpegCommentBlock(frame);
 
     mReceivedFrameCounter++;
     return true;

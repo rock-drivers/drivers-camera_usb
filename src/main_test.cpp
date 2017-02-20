@@ -1,11 +1,14 @@
 #include "camera_usb/cam_usb.h"
 
+//#include <opencv2/core/core.hpp>
+//#include <opencv2/highgui/highgui.hpp>
+
 enum CamMenu {MAIN, CONFIGURATION, IMAGE_REQUESTING};
 
 void printMainMenu() {
     std::cout << "Menu Main" << std::endl;
-    std::cout << "1. Configuration" << std::endl;
-    std::cout << "2. Image requesting" << std::endl;
+    std::cout << "1. V4L2" << std::endl;
+    std::cout << "2. GStreamer" << std::endl;
     std::cout << "3. Exit" << std::endl;
 }
 
@@ -15,7 +18,8 @@ void printConfigurationMenu() {
     std::cout << "2. List controls" << std::endl;
     std::cout << "3. List image format" << std::endl;
     std::cout << "4. List stream parameters" << std::endl;
-    std::cout << "5. Back" << std::endl;
+    std::cout << "5. Request image using v4l2" << std::endl;
+    std::cout << "6. Back" << std::endl;
 }
 
 void printImageRequestingMenu() {
@@ -36,6 +40,16 @@ int getRequest(int start, int stop) {
     return value;
 }
 
+double calculate_fps(timeval start_time_grabbing, int num_received_images) {
+    timeval stop_time_grabbing;
+    gettimeofday(&stop_time_grabbing, 0);
+    double sec = stop_time_grabbing.tv_sec - start_time_grabbing.tv_sec;
+    if(sec == 0)
+        return 0;
+    else
+        return num_received_images / sec;
+}
+
 int main(int argc, char* argv[]) 
 {
     using namespace camera;
@@ -51,13 +65,22 @@ int main(int argc, char* argv[])
     if(argc == 2) {
         device = argv[1];
     }
-
+    
+    std::cout << "Device: " << device << std::endl;
+    
     int ret = 0;
     CamMenu cam_menu = MAIN;
     CamConfig* cam_config = NULL;
     CamGst* cam_gst = NULL;
     std::vector<uint8_t> buffer;
-
+    
+    int numImagesToRequest = 100;
+    
+    /*
+    cv::Mat frame = cv::Mat::zeros(480, 640, CV_8UC3);
+    cv::namedWindow("window",CV_WINDOW_AUTOSIZE);
+    cv::waitKey(10);
+    */
     while(true) {
         switch(cam_menu) {
             case MAIN: {
@@ -67,13 +90,12 @@ int main(int argc, char* argv[])
                     case 1: {
                         cam_menu = CONFIGURATION;
                         cam_config = new CamConfig(device);
+                        cam_config->writeImagePixelFormat(640, 480);
                         break;
                     }
                     case 2: {
                         cam_menu = IMAGE_REQUESTING;
                         cam_gst = new CamGst(device);
-                        cam_gst->createDefaultPipeline(true, 640, 480, 10, 80);
-                        cam_gst->startPipeline();
                         break;
                     }
                     case 3: {
@@ -84,7 +106,7 @@ int main(int argc, char* argv[])
             }
             case CONFIGURATION: {
                 printConfigurationMenu();
-                ret = getRequest(1, 5);
+                ret = getRequest(1, 6);
                 switch(ret) {
                     case 1: {
                         cam_config->readCapability();
@@ -107,6 +129,43 @@ int main(int argc, char* argv[])
                         break;
                     }
                     case 5: {
+                        try {
+                            cam_config->initRequesting();
+                            
+                            timeval start_time;
+                            gettimeofday(&start_time, 0);
+                            
+                            for(int i=0; i<numImagesToRequest; i++) {
+                               
+                                if(!cam_config->getBuffer(buffer, true, 2000)) {
+                                    std::cout << "Image could not be requested" << std::endl;
+                                } else {
+                                    std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
+                                }    
+                                
+                                /*
+                                cv::Mat test = cv::imdecode(buffer, CV_LOAD_IMAGE_COLOR);
+                                if (test.empty() == true) {
+                                    std::cout << "Empty image: problem to decode the buffer." << std::endl;
+                                }
+                                frame = test.clone();
+                                cv::imshow("window", frame);
+                                cv::waitKey(10);
+                                */
+                                
+                            }
+
+                            cam_config->cleanupRequesting();
+                            std::cout << "v4l2 image requesting: done " << std::endl;
+                            double fps = calculate_fps(start_time, numImagesToRequest); 
+                            std::cout << "FPS: " << fps << std::endl;
+                                   
+                        } catch(std::runtime_error& e) {
+                            std::cout << "Error v4l2 image requesting" << std::endl;
+                        }
+                        break;
+                    }
+                    case 6: {
                         cam_menu = MAIN;
                         delete cam_config;
                         cam_config = NULL;
@@ -120,15 +179,35 @@ int main(int argc, char* argv[])
                 ret = getRequest(1, 3);
                 switch(ret) {
                     case 1: {
-                        cam_gst->createDefaultPipeline(true, 0, 0, 0, 24, base::samples::frame::MODE_JPEG, 80);
+                        cam_gst->createDefaultPipeline(true, 640, 480, 30, 24, base::samples::frame::MODE_JPEG, 80);
                         cam_gst->startPipeline();
-                        if(!cam_gst->getBuffer(buffer, true, 2000)) {
-                            std::cout << "Image could not be requested" << std::endl;
-                        } else {
-                            std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
+                        
+                        timeval start_time;
+                        gettimeofday(&start_time, 0);
+                        
+                        for(int i=0; i<numImagesToRequest; i++) {
+                            if(!cam_gst->getBuffer(buffer, true, 2000)) {
+                                std::cout << "Image could not be requested" << std::endl;
+                            } else {
+                                std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
+                            }
+                            
+                            /*
+                            cv::Mat test = cv::imdecode(buffer, CV_LOAD_IMAGE_COLOR);
+                            if (test.empty() == true) {
+                                std::cout << "Empty image: problem to decode the buffer." << std::endl;
+                            }
+                            frame = test.clone();
+                            cv::imshow("window", frame);
+                            //cv::waitKey(10); // Does not work with GStreamer?
+                            */
                         }
+                        
                         cam_gst->stopPipeline();
                         cam_gst->deletePipeline();
+                        
+                        double fps = calculate_fps(start_time, numImagesToRequest); 
+                        std::cout << "FPS: " << fps << std::endl;
                         break;
                     }
                     case 2: {
@@ -153,6 +232,7 @@ int main(int argc, char* argv[])
                 std::cout << "Unknown answer" << std::endl; 
             }
         }
+      
     }
 }
 

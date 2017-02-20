@@ -254,29 +254,6 @@ bool CamGst::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read,
             // Copy buffer for return.
             buffer.resize(mBufferSize);
             memcpy(&buffer[0], GST_BUFFER_DATA(mBuffer), mBufferSize);
-            
-            // Little Hack: Someone (OpenCV?) does not understand JPEG comment-blocks.
-            // Removes comment block to avoid getting 
-            // 'Corrupt JPEG data: x extraneous bytes before marker 0xe0.'
-            if(mRequestedFrameMode == MODE_JPEG) {
-                std::vector<uint8_t>::iterator it = buffer.begin();
-                std::vector<uint8_t>::iterator it_n = buffer.begin() + 1;
-                for(; it_n != buffer.end(); it++, it_n++) {
-                    if(*it == 0xFF && *it_n == 0xFE) {
-                        size_t old_length = *(it+2)<<8 | *(it_n+2);
-                        // e.g. empty comment block: FF FE 00 02 XX
-                        //                           it          it+4
-                        buffer.erase(it, it + (2 + old_length)); 
-                        break;
-                    }
-                    
-                    // Start of scan, no comment block found.
-                    if(*it == 0xFF && *it_n == 0XDA) {
-                        break;
-                    }
-                }
-            }
- 
             mNewBuffer = false;
             pthread_mutex_unlock(&mMutexBuffer);
             blocking_read = false; // Done, return true.

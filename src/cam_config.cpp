@@ -1,23 +1,18 @@
 #include "cam_config.h"
 
-#include <fcntl.h> // for open()
-#include <stdio.h>
-#include <sys/ioctl.h>
-
-#include <iostream>
-
 namespace camera 
 {
  
 CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtrls(), 
-            mFormat(), mStreamparm() {
+            mFormat(), mCropcap(), mFormatDescriptions(), mStreamparm(), mmapBuffer(NULL), streamingActivated(false) {
     LOG_DEBUG("CamConfig: constructor");
     
     memset(&mCapability, 0, sizeof(struct v4l2_capability));
+    memset(&mCropcap, 0, sizeof(struct v4l2_cropcap));
     memset(&mFormat, 0, sizeof(struct v4l2_format));
     memset(&mStreamparm, 0, sizeof(struct v4l2_streamparm));
 
-    mFd = ::open(device.c_str(), O_NONBLOCK | O_RDWR);
+    mFd = ::open(device.c_str(),  O_NONBLOCK | O_RDWR);
     if (mFd <= 0) {
         LOG_FATAL("Could not open device %s",device.c_str());
         std::string err_str(strerror(errno));
@@ -44,6 +39,10 @@ CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtr
         LOG_ERROR("%s",err.what());
     }
     try {
+        // Creates dmesgs: 
+        //[ 6239.025909] uvcvideo: Failed to query (SET_CUR) UVC control 10 on unit 3: -32 (exp. 2).
+        //[ 6239.026564] uvcvideo: Failed to query (SET_CUR) UVC control 4 on unit 1: -32 (exp. 4).
+        //[ 6239.028447] uvcvideo: Failed to query (SET_CUR) UVC control 6 on unit 1: -32 (exp. 2).
         readControl();
     } catch (CamConfigException& err) {
         LOG_ERROR("%s",err.what());
@@ -68,9 +67,10 @@ CamConfig::~CamConfig() {
 // CAPABILITY
 void CamConfig::readCapability() {
     LOG_DEBUG("CamConfig: readCapability");
+    
+    // read camera capabilities
     memset (&mCapability, 0, sizeof (struct v4l2_capability));
-
-    if (ioctl(mFd, VIDIOC_QUERYCAP, &mCapability) != 0) {
+    if (xioctl(mFd, VIDIOC_QUERYCAP, &mCapability) == -1) {
         std::string err_str(strerror(errno));
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
@@ -84,46 +84,46 @@ void CamConfig::listCapabilities() {
     LOG_DEBUG("CamConfig: listCapabilities");
 
     printf("CAMERA CAPABILITIES\n");
-    printf("Driver: %s\n", getCapabilityDriver().c_str());
-    printf("Card: %s\n", getCapabilityCard().c_str());
-    printf("Bus Info: %s\n", getCapabilityBusInfo().c_str());
-    printf("Version: %d\n", getCapabilityVersion());
+    printf("    Driver: %s\n", getCapabilityDriver().c_str());
+    printf("    Card: %s\n", getCapabilityCard().c_str());
+    printf("    Bus Info: %s\n", getCapabilityBusInfo().c_str());
+    printf("    Version: %s\n", getCapabilityVersion().c_str());
 
     uint32_t flag = mCapability.capabilities;
-    printf("Capabilities: ");
+    printf("    Capabilities:\n");
     if(flag & V4L2_CAP_VIDEO_CAPTURE) 
-        printf("V4L2_CAP_VIDEO_CAPTURE: The device can capture video data.\n");
+        printf("        V4L2_CAP_VIDEO_CAPTURE: The device can capture video data.\n");
     if(flag & V4L2_CAP_VIDEO_OUTPUT) 
-        printf("V4L2_CAP_VIDEO_OUTPUT: The device can perform video output.\n");
+        printf("        V4L2_CAP_VIDEO_OUTPUT: The device can perform video output.\n");
     if(flag & V4L2_CAP_VIDEO_OVERLAY) 
-        printf("V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer.\n");
+        printf("        V4L2_CAP_VIDEO_OVERLAY: It can do video overlay onto the frame buffer.\n");
     if(flag & V4L2_CAP_VBI_CAPTURE) 
-        printf("V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data.\n");
+        printf("        V4L2_CAP_VBI_CAPTURE: It can capture raw video blanking interval data.\n");
     if(flag & V4L2_CAP_VBI_OUTPUT) 
-        printf("V4L2_CAP_VBI_OUTPUT: It can do raw VBI output.\n");
+        printf("        V4L2_CAP_VBI_OUTPUT: It can do raw VBI output.\n");
     if(flag & V4L2_CAP_SLICED_VBI_CAPTURE) 
-        printf("V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture.\n");
+        printf("        V4L2_CAP_SLICED_VBI_CAPTURE: It can do sliced VBI capture.\n");
     if(flag & V4L2_CAP_SLICED_VBI_OUTPUT) 
-        printf("V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output.\n");
+        printf("        V4L2_CAP_SLICED_VBI_OUTPUT: It can do sliced VBI output.\n");
     if(flag & V4L2_CAP_RDS_CAPTURE) 
-        printf("V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data.\n");
+        printf("        V4L2_CAP_RDS_CAPTURE: It can capture Radio Data System (RDS) data.\n");
     if(flag & V4L2_CAP_TUNER) 
-        printf("V4L2_CAP_TUNER: It has a computer-controllable tuner.\n");
+        printf("        V4L2_CAP_TUNER: It has a computer-controllable tuner.\n");
     if(flag & V4L2_CAP_AUDIO) 
-        printf("V4L2_CAP_AUDIO: It can capture audio data.\n");
+        printf("        V4L2_CAP_AUDIO: It can capture audio data.\n");
     if(flag & V4L2_CAP_RADIO) 
-        printf("V4L2_CAP_RADIO: It is a radio device.\n");
+        printf("        V4L2_CAP_RADIO: It is a radio device.\n");
     if(flag & V4L2_CAP_READWRITE) 
-        printf("V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" \
+        printf("        V4L2_CAP_READWRITE: It supports the read() and/or write() system calls;" \
                 " very few devices will support both. It makes little sense to write " \
                 "to a camera, normally.\n");
     if(flag & V4L2_CAP_ASYNCIO) 
-        printf("V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " \
+        printf("        V4L2_CAP_ASYNCIO: It supports asynchronous I/O. Unfortunately, " \
                 "the V4L2 layer as a whole does not yet support asynchronous I/O, " \
                 "so this capability is not meaningful.\n");
     if(flag & V4L2_CAP_STREAMING) 
-        printf("V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O.\n");
-    printf("\n");
+        printf("        V4L2_CAP_STREAMING: It supports ioctl()-controlled streaming I/O.\n");
+    printf("\n");            
 }
 
 std::string CamConfig::getCapabilityDriver() {
@@ -144,8 +144,11 @@ std::string CamConfig::getCapabilityBusInfo() {
     return std::string(buffer);
 }
 
-uint32_t CamConfig::getCapabilityVersion() {
-    return mCapability.version;
+std::string CamConfig::getCapabilityVersion() {
+    std::stringstream ss;
+    ss << ((mCapability.version>>16)&&0xff) << "." << ((mCapability.version>>24)&&0xff);
+    std::string str = ss.str();    
+    return str;
 }
 
 bool CamConfig::hasCapability(uint32_t capability_field) {
@@ -174,6 +177,7 @@ void CamConfig::readControl() {
     mCamCtrls.clear();
 
     // Checks which controls are offered by the camera / device-driver.
+    // uvcvideo: Failed to query (SET_CUR) UVC control 10 on unit 3: -32 (exp. 2).
     LOG_DEBUG("Check base control IDs");
     for (int i = V4L2_CID_BASE; 
             i < V4L2_CID_LASTP1;
@@ -230,7 +234,9 @@ void CamConfig::readControl() {
                     i-V4L2_CID_MPEG_BASE, e.what());
         }
     }
-
+    
+    // uvcvideo: Failed to query (SET_CUR) UVC control 4 on unit 1: -32 (exp. 4).
+    // uvcvideo: Failed to query (SET_CUR) UVC control 6 on unit 1: -32 (exp. 2).
     LOG_DEBUG("Check MPEG base control IDs specific to the CX2341x driver");
     for (int i = V4L2_CID_MPEG_CX2341X_BASE+0; 
             i < V4L2_CID_MPEG_CX2341X_BASE+12;
@@ -325,7 +331,15 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
     unsigned int original_control_id = queryctrl_tmp.id;
 
     // Control-request successful?
-    if (0 == ioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp)) {
+    if (xioctl (mFd, VIDIOC_QUERYCTRL, &queryctrl_tmp) == -1) { // no
+        // Unknown control, will be ignored.
+        if (errno == EINVAL) { 
+            LOG_DEBUG("Control %d not available and will be ignored", original_control_id);
+            return;
+        }
+        std::string err_str(strerror(errno)); 
+        throw std::runtime_error(err_str.insert(0, "Could not query control: ")); 
+    } else {  // yes
         // Control available by the camera (continue if not)?
         if (queryctrl_tmp.flags & V4L2_CTRL_FLAG_DISABLED) {
             LOG_INFO("Control id %d marked as disabled", original_control_id);
@@ -360,16 +374,16 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
             // Store menu item names if the type of the control is a menu. 
             for (int i = queryctrl_tmp.minimum; i <= queryctrl_tmp.maximum; ++i) {
                 querymenu_tmp.index = (uint32_t)i;
-                if (0 == ioctl (mFd, VIDIOC_QUERYMENU, &querymenu_tmp)) {
-                    // Store names of the menu items.
+                if (xioctl (mFd, VIDIOC_QUERYMENU, &querymenu_tmp) == -1) {
+                    std::string err_str(strerror(errno));
+                    throw std::runtime_error(err_str.insert(0, 
+                        "Could not read menu item: "));
+                } else {
+                   // Store names of the menu items.
                     char buffer[32];
                     snprintf(buffer, 32, "%s", querymenu_tmp.name);
                     cam_ctrl.mMenuItems.push_back(buffer);
                     LOG_DEBUG(" - menu entry %s", buffer);
-                } else {
-                    std::string err_str(strerror(errno));
-                    throw std::runtime_error(err_str.insert(0, 
-                        "Could not read menu item: "));
                 }
             }
         }
@@ -408,15 +422,7 @@ void CamConfig::readControl(struct v4l2_queryctrl& queryctrl_tmp) {
                 }
             }
         }
-    } else {
-        // Unknown control, will be ignored.
-        if (errno == EINVAL) { 
-            LOG_DEBUG("Control %d not available and will be ignored", original_control_id);
-            return;
-        }
-        std::string err_str(strerror(errno)); 
-        throw std::runtime_error(err_str.insert(0, "Could not query control: ")); 
-    }
+    } 
 }
 
 int32_t CamConfig::readControlValue(uint32_t const id) {
@@ -428,7 +434,7 @@ int32_t CamConfig::readControlValue(uint32_t const id) {
     memset(&control, 0, sizeof(struct v4l2_control));
     control.id = id;
    
-    if (0 != ioctl (mFd, VIDIOC_G_CTRL, &control)) {
+    if (xioctl (mFd, VIDIOC_G_CTRL, &control) == -1) {
         std::string err_str(strerror(errno)); 
         throw std::runtime_error(err_str.insert(0, "Could not read control object value: ")); 
     }
@@ -482,13 +488,7 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value, bool just_wr
         }
     }
 
-    if(0 == ioctl (mFd, VIDIOC_S_CTRL, &control)) {
-        if(!just_write) {
-            // Change internally stored value as well.
-            it->second.mValue = value;
-        }
-        LOG_DEBUG("Control value %s (0x%x (%d)) set to %d", control_name.c_str(), id, id, value);
-    } else {
+    if(xioctl (mFd, VIDIOC_S_CTRL, &control) == -1) {
         std::string err_str(strerror(errno));
         
         // ID unknown? Should not happen or data would be out of sync.
@@ -503,6 +503,12 @@ void CamConfig::writeControlValue(uint32_t const id, int32_t value, bool just_wr
         } else {
             throw std::runtime_error(err_str.insert(0, "Could not write control object: ")); 
         }
+    } else {
+        if(!just_write) {
+            // Change internally stored value as well.
+            it->second.mValue = value;
+        }
+        LOG_DEBUG("Control value %s (0x%x (%d)) set to %d", control_name.c_str(), id, id, value);
     }
 }
 
@@ -703,7 +709,7 @@ void CamConfig::readImageFormat() {
     // struct v4l2_pix_format should be requested.
     mFormat.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-    if(0 != ioctl(mFd, VIDIOC_G_FMT, &mFormat)) {
+    if(xioctl(mFd, VIDIOC_G_FMT, &mFormat) == -1) {
         std::string err_str(strerror(errno));
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
@@ -711,6 +717,39 @@ void CamConfig::readImageFormat() {
         }
         throw std::runtime_error(err_str.insert(0, "Could not read image format: "));
     }
+        
+    // Read image formats. 
+    struct v4l2_fmtdesc format_description;
+    mFormatDescriptions.clear();
+    int index = 0;
+    
+    while (true)
+    { 
+        memset(&format_description, 0, sizeof(struct v4l2_fmtdesc));
+        format_description.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        format_description.index = index;
+        
+        if(xioctl(mFd, VIDIOC_ENUM_FMT, &format_description) == -1) {
+            break;
+        }
+        mFormatDescriptions.push_back(format_description);
+        index++;
+    }
+    
+    /*
+     // Read camera crop capabilities.
+    memset(&mCropcap, 0, sizeof(struct v4l2_cropcap));
+    mCropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (xioctl (mFd, VIDIOC_CROPCAP, &mCropcap) == -1)
+    {
+        std::string err_str(strerror(errno));
+        if(errno == EINVAL) {
+            throw CamConfigException(err_str.insert(0, 
+                    "VIDIOC_CROPCAP is not supported by device driver: "));
+        }
+        throw std::runtime_error(err_str.insert(0, "Could not read crop capability: "));        
+    }
+    */
 }
 
 void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const height, 
@@ -730,7 +769,7 @@ void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const heigh
         mFormat.fmt.pix.pixelformat = pixelformat;
     
     // Suggest the new format and fill mFormat with the actual one the driver choosed.
-    if(0 != ioctl(mFd, VIDIOC_S_FMT, &mFormat)) {
+    if(xioctl(mFd, VIDIOC_S_FMT, &mFormat) == -1) {
         std::string err_str(strerror(errno));
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
@@ -742,7 +781,7 @@ void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const heigh
 
 void CamConfig::listImageFormat() {
     
-    printf("CAMERA IMAGE FORMATS\n");
+    printf("CAMERA IMAGE FORMAT\n");
     std::string pixelformat_str;
     getImagePixelformatString(&pixelformat_str);
     printf("Image width: %d\n", mFormat.fmt.pix.width);
@@ -753,6 +792,34 @@ void CamConfig::listImageFormat() {
     printf("Image sizeimage: %d\n", mFormat.fmt.pix.sizeimage);
     printf("Image colorspace: %d\n", mFormat.fmt.pix.colorspace);
     printf("\n");
+    
+    printf("AVAILABLE IMAGE FORMATS\n");
+    char fourcc[5] = {0};
+    bool compressed=false, emulated=false;
+    std::vector<struct v4l2_fmtdesc>::iterator it = mFormatDescriptions.begin();
+    printf("FourCC Compressed Emulated Description\n");
+    for(; it != mFormatDescriptions.end(); it++) {
+        strncpy(fourcc, (char *)&(it->pixelformat), 4);
+
+        compressed = it->flags & 1 ? true : false;
+        emulated = it->flags & 2 ? true : false;
+        
+        printf("%6s %10s %8s %11s\n", fourcc, compressed ? "yes" : "no", 
+                emulated ? "yes" : "no", it->description);
+        
+    }
+    printf("\n");
+    
+    /*
+    printf("CAMERA CROPPING\n");
+    printf( "    Bounds: %dx%d+%d+%d\n"
+            "    Default: %dx%d+%d+%d\n"
+            "    Aspect: %d/%d\n",
+            mCropcap.bounds.width, mCropcap.bounds.height, mCropcap.bounds.left, mCropcap.bounds.top,
+            mCropcap.defrect.width, mCropcap.defrect.height, mCropcap.defrect.left, mCropcap.defrect.top,
+            mCropcap.pixelaspect.numerator, mCropcap.pixelaspect.denominator);  
+    printf("\n");
+    */
 }
 
 bool CamConfig::getImageWidth(uint32_t* width) {
@@ -850,7 +917,7 @@ void CamConfig::readStreamparm() {
 
     mStreamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-    if (ioctl(mFd, VIDIOC_G_PARM, &mStreamparm) != 0) {
+    if (xioctl(mFd, VIDIOC_G_PARM, &mStreamparm) == -1) {
         std::string err_str(strerror(errno));
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
@@ -884,7 +951,7 @@ void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denomin
         LOG_DEBUG("denominator is 0");
 
     // Suggest the new stream parameters and fill mStreamparm with the actual one the driver choosed.
-    if(0 != ioctl(mFd, VIDIOC_S_PARM, &mStreamparm)) {
+    if(xioctl(mFd, VIDIOC_S_PARM, &mStreamparm) == -1) {
         std::string err_str(strerror(errno));
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
@@ -989,6 +1056,201 @@ bool CamConfig::hasCapturemodeStreamparm(uint32_t capturemode) {
     }
 
     return (capturemode & mStreamparm.parm.capture.capturemode);
+}
+
+// REQUEST IMAGES 
+void CamConfig::initRequesting() {
+
+    // Request buffer.
+    struct v4l2_requestbuffers request_buffer;
+    memset(&request_buffer, 0, sizeof(struct v4l2_requestbuffers));
+    // TODO: More than one buffer should be used!
+    request_buffer.count = 1;
+    request_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    request_buffer.memory = V4L2_MEMORY_MMAP;
+    
+    if(xioctl(mFd, VIDIOC_REQBUFS, &request_buffer) == -1) {
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not request a video buffer: "));
+    }
+       
+    // Query buffer.
+    struct v4l2_buffer query_buffer;
+    getQueryBuffer(query_buffer);
+    
+    // Prepare the mmap pointer.
+    mmapBuffer = NULL;
+    errno = 0;
+    // mmap creates a 'virtual' map of the memory: Maps device memory into the application address space.
+    // So this is actuall the pointer to the image.
+    mmapBuffer = (uint8_t*)mmap(NULL, query_buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, mFd, query_buffer.m.offset);
+    if(mmapBuffer == NULL || mmapBuffer ==  MAP_FAILED) { // mmap() returns the buffer or -1 if an error occurred.
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not query the video buffer: "));
+    }
+    
+    // IMPORTANT: must to start stream here? or it is enough to start in getBuffer??
+    // Start streaming. Streaming must only be started once!
+    // Creates dmesgs: restoring control 00000000-0000-0000-0000-000000000001/2/3
+    if(xioctl(mFd, VIDIOC_STREAMON, &(query_buffer.type)) == -1){
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not start capturing: "));
+    }
+    
+    streamingActivated = true;
+}
+    
+/**
+    * Used http://www.jayrambhia.com/blog/capture-v4l2
+    * \param blocking_read Not used, function always waits timeout_ms milliseconds.
+    */
+bool CamConfig::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int32_t timeout_ms) {
+    
+    struct v4l2_buffer q_buffer = {0};
+    q_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    q_buffer.memory = V4L2_MEMORY_MMAP;
+    q_buffer.index = 0;
+    if(-1 == xioctl(mFd, VIDIOC_QBUF, &q_buffer))
+    {
+        perror("Query Buffer");
+        return false;
+    }
+ 
+    /*if(-1 == xioctl(mFd, VIDIOC_STREAMON, &buf.type))
+    {
+        perror("Start Capture");
+        return false;
+    }
+ 
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(mFd, &fds);
+    struct timeval tv = {0};
+    tv.tv_sec = 2;
+    int r = select(mFd+1, &fds, NULL, NULL, &tv);
+    if(-1 == r)
+    {
+        perror("Waiting for Frame");
+        return false;
+    }
+    
+    printf("Before retrieve\n"); 
+    if(-1 == xioctl(mFd, VIDIOC_DQBUF, &buf))
+    {
+        printf("Error retrieve\n");
+        perror("Retrieving Frame");
+        return false;
+    }
+
+    // Image is available at mmapBuffer now.
+    std::cout << "buf.length: " << buf.length << std::endl;
+    buffer.resize(buf.length);
+    memcpy(buffer.data(), mmapBuffer, buf.length);
+    
+    printf ("saving image\n");*/
+    
+    
+    // Query buffer.
+   // struct v4l2_buffer query_buffer;
+//	getQueryBuffer(query_buffer);
+
+	// Start streaming. Streaming must only be started once!
+	/*
+    if(xioctl(mFd, VIDIOC_STREAMON, &query_buffer.type) == -1){
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not start capturing: "));
+    }*/
+    
+    // Wait for an image.
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(mFd, &fds);
+    struct timeval waiting_time;
+    memset(&waiting_time, 0, sizeof(waiting_time));
+    waiting_time.tv_usec = timeout_ms * 1000;
+    // Is data available?
+    errno = 0;
+    // On timeout select returns 0. Expects mFd + 1, yes.
+    // waiting_time could contain the waiting time left.
+    int ret = select(mFd+1, &fds, NULL, NULL, &waiting_time);
+    if(ret == -1) {
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Error waiting for image data: "));
+    }
+    
+    if(ret == 0) {
+        std::cout << "No image availale" << std::endl;
+        return false;
+    }
+    
+    std::cout << "length buffer " << q_buffer.length << std::endl;
+    
+   // if(!(q_buffer.flags & (V4L2_BUF_FLAG_QUEUED | V4L2_BUF_FLAG_DONE))) { // does not help
+    
+        // Data available, resize the passed buffer and copy the image.
+        // By default VIDIOC_DQBUF blocks when no buffer is in the outgoing queue. 
+        // When the O_NONBLOCK flag was given to the open() function, VIDIOC_DQBUF returns 
+        // immediately with an EAGAIN error code when no buffer is available.
+        buffer.resize(q_buffer.length);
+        if(xioctl(mFd, VIDIOC_DQBUF, &q_buffer) == -1) {
+            std::string err_str(strerror(errno));
+            throw std::runtime_error(err_str.insert(0, "Error capturing the image: "));
+        }
+        
+        // Image is available at mmapBuffer now.
+        memcpy(buffer.data(), mmapBuffer, q_buffer.length);
+    //} else {
+    //    std::cout << "V4L2_BUF_FLAG_QUEUED | V4L2_BUF_FLAG_DONE" << std::endl;
+    //}
+    
+    return true;
+}
+
+void CamConfig::cleanupRequesting() {
+    if(!streamingActivated) {
+        LOG_INFO("v4l2 streaming is not active, no cleanup required");
+        return;
+    }
+    
+    struct v4l2_buffer query_buffer;
+	getQueryBuffer(query_buffer);
+    
+    // Stops streaming.
+    if(xioctl(mFd, VIDIOC_STREAMOFF, &(query_buffer.type)) == -1){
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not start capturing: "));
+    }
+    
+    // Unmap buffer / device memory.
+    errno = 0;
+    if(munmap(mmapBuffer, query_buffer.length) == -1) {
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not unmap device memory: "));
+    }
+    mmapBuffer = NULL;
+    
+    streamingActivated = false;
+}
+
+void CamConfig::getQueryBuffer(struct v4l2_buffer& query_buffer) {
+    memset(&query_buffer, 0, sizeof(query_buffer));
+    query_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    query_buffer.memory = V4L2_MEMORY_MMAP;
+    query_buffer.index = 0; // Number of the requested buffer: 0 to count-1.
+    if(xioctl(mFd, VIDIOC_QUERYBUF, &query_buffer)) {
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Could not query the video buffer: "));
+    }
+}
+
+int CamConfig::xioctl(int fd, int request, void *arg) {
+    int ret;
+    errno = 0; // No error.
+    do {
+        ret = ioctl (fd, request, arg);
+    }
+    while (-1 == ret && EINTR == errno);
+    return ret;
 }
 
 } // end namespace camera

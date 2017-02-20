@@ -16,26 +16,28 @@
 #define _CAM_V4L2_CONFIG_H_
 
 // for v4l2 api (everything required?)
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
+#include <errno.h>
+#include <fcntl.h> // for open()
 #include <linux/videodev2.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <stdlib.h>
 
 // e-CAM32 v4l2 controls
 #include "omap_v4l2.h"
-
-#include <errno.h>
-#include <string.h>
 
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <set>
+#include <iostream>
 
 #include <base-logging/Logging.hpp>
 
@@ -53,7 +55,8 @@ class CamConfigException : public std::runtime_error {
 };
 
 /**
- * Using v4l2 to read and set the parameters of the specified camera.
+ * Using v4l2 to read and set the parameters of the specified camera and to read camera
+ * images as well.
  * Important: For newly-connected cameras the device driver may return a wrong image size!
  * Prevent that by calling writeImagePixelFormat() without any parameters during initialization.
  */
@@ -107,7 +110,7 @@ class CamConfig
 
     std::string getCapabilityBusInfo();
 
-    uint32_t getCapabilityVersion();
+    std::string getCapabilityVersion();
 
     /** 
      * \param field E.g. V4L2_CAP_VIDEO_CAPTURE or V4L2_CAP_VIDEO_OUTPUT.
@@ -289,6 +292,17 @@ class CamConfig
      * Used to get single images in maximal quality.
      */
     bool hasCapturemodeStreamparm(uint32_t capturemode);
+    
+ public: // REQUEST IMAGE
+     
+    void initRequesting();
+    /**
+     * Used http://www.jayrambhia.com/blog/capture-v4l2
+     * \param blocking_read Not used, function always waits timeout_ms milliseconds.
+     */
+    bool getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int32_t timeout_ms);
+    
+    void cleanupRequesting();
 
  private:
     int mFd; /// File-descriptor to the camera.
@@ -299,14 +313,29 @@ class CamConfig
     std::map<uint32_t, struct CamCtrl> mCamCtrls;
     // Image
     struct v4l2_format mFormat;
+    struct v4l2_cropcap mCropcap;
+    std::vector<struct v4l2_fmtdesc> mFormatDescriptions;
     // Stream
     struct v4l2_streamparm mStreamparm;
     // Used to collect all controls depending on another control.
     // E.g. V4L2_CID_FOCUS_ABSOLUTE and V4L2_CID_FOCUS_RELATIVE can only be changed
     // if V4L2_CID_FOCUS_AUTO is set to 0 (manual).
     std::set<uint32_t> mAutoManualDependentControlIds;
+    // Points to the image which has been requested via ioctl.
+    uint8_t* mmapBuffer;
+    bool streamingActivated;
 
     CamConfig() {}
+    
+    /**
+     * Used in the request image functions.
+     */
+    void getQueryBuffer(struct v4l2_buffer& query_buffer);
+    
+    /**
+     * ioctl calls could be interrupted (EINTR), in this case another call is required.
+     */
+    int xioctl(int fd, int request, void *arg);
 
 };
 
