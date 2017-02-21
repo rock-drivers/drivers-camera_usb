@@ -285,32 +285,6 @@ bool CamGst::skipBuffer() {
     return skipped;
 }
 
-bool CamGst::storeImageToFile(std::vector<uint8_t> const& buffer, 
-        std::string const& file_name) {
-    LOG_DEBUG("CamGst: storeImageToFile, buffer contains %d bytes, stores to %s", 
-            buffer.size(), file_name.c_str());
-
-    if(buffer.empty()) {
-        LOG_WARN("Empty buffer passed, nothing will be stored");
-        return false;
-    }
-
-    FILE* file = NULL;
-    file = fopen(file_name.c_str(),"w");
-    if(file == NULL) {
-        LOG_ERROR("File %s could not be opened, no image will be stored", file_name.c_str());
-        return false;
-    }
-  	unsigned int written = fwrite (&buffer[0], 1 , buffer.size(), file);
-    if(written != buffer.size()) {
-        LOG_ERROR("Only %d of %d bytes could be written", written, buffer.size());
-        fclose(file);
-        return false;
-    }
-    fclose(file);
-    return true;
-}
-
 // PRIVATE
 
 CamGst::CamGst() {}

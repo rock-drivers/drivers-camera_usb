@@ -1,4 +1,6 @@
 #include "camera_usb/cam_usb.h"
+#include "helpers.h"
+
 
 //#include <opencv2/core/core.hpp>
 //#include <opencv2/highgui/highgui.hpp>
@@ -67,6 +69,26 @@ int main(int argc, char* argv[])
     }
     
     std::cout << "Device: " << device << std::endl;
+    
+    
+    // Start conversion test
+    /*
+    CamUsb cam(device);
+    std::vector<CamInfo> cam_info;
+    cam.listCameras(cam_info);
+    cam.open(cam_info[0]);
+    const base::samples::frame::frame_size_t size(640, 480);
+    cam.setFrameSettings(size, base::samples::frame::MODE_RGB, 3);
+    cam.grab();
+    base::samples::frame::Frame frame;
+    frame.init(640, 480, 8, base::samples::frame::MODE_RGB);
+    cam.retrieveFrame(frame, 2000);
+    return 0;
+    */
+    // End conversion test
+    
+    
+    
     
     int ret = 0;
     CamMenu cam_menu = MAIN;
@@ -215,7 +237,7 @@ int main(int argc, char* argv[])
                             std::cout << "Request an image first" << std::endl;
                         } else {
                             std::string file_name("test_img.jpg");
-                            cam_gst->storeImageToFile(buffer, file_name);
+                            Helpers::storeImageToFile(buffer, file_name);
                         }
                         break;
                     }

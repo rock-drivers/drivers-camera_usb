@@ -23,6 +23,7 @@ extern "C" {
 }
 
 #include "camera_usb/cam_gst.h"
+#include <camera_usb/helpers.h>
 
 BOOST_AUTO_TEST_CASE(default_pipeline_test) {
     camera::CamGst gst("/dev/video0");
@@ -87,7 +88,7 @@ BOOST_AUTO_TEST_CASE(request_image_test) {
         if(new_buf) {
             BOOST_CHECK(buffer.size() > 0);
             snprintf(name_buffer, 128, "test.jpeg");
-            gst.storeImageToFile(buffer, name_buffer);
+            camera::Helpers::storeImageToFile(buffer, name_buffer);
             ++img_received;
         }
         usleep(10);
@@ -102,7 +103,7 @@ BOOST_AUTO_TEST_CASE(request_image_test) {
         if(new_buf) {
             BOOST_CHECK(buffer.size() > 0);
             snprintf(name_buffer, 128, "test.jpeg");
-            gst.storeImageToFile(buffer, name_buffer);
+            camera::Helpers::storeImageToFile(buffer, name_buffer);
             ++img_received;
         }
         usleep(10);

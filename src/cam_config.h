@@ -41,6 +41,10 @@
 
 #include <base-logging/Logging.hpp>
 
+#include <base/samples/Frame.hpp>
+
+#include "helpers.h"
+
 namespace camera 
 {
 
@@ -216,8 +220,6 @@ class CamConfig
      * Tries to write the requested image size and the pixelformat.
      * Driver will set the most suitable and stores it in mFormat.
      * If you do not want to change a parameter, just pass 0.
-     * It is recommed to call this method without any parameter to take sure
-     * that the image size, which is passed by the device-driver, is correct.
      * Requires type V4L2_BUF_TYPE_VIDEO_CAPTURE.
      * \pixelformat E.g. V4L2_PIX_FMT_YUYV, V4L2_PIX_FMT_JPEG, V4L2_PIX_FMT_MJPEG.
      * Pass 0 to use the current pixel format which is set on the camera.
@@ -249,8 +251,16 @@ class CamConfig
     bool getImageSizeimage(uint32_t* sizeimage);
 
     bool getImageColorspace(uint32_t* colorspace);
+    
+    /**
+     * Tries to map a rock to a v4l2 mode. Problem is that rock 
+     * only supports a few image formats and e.g. no YUYV which is a base raw format
+     * for most of the cameras. So if RGB is requested but not available
+     * YUV will be used and converted to RGB.
+     */
+    uint32_t toV4L2ImageFormat(base::samples::frame::frame_mode_t mode);
 
- public: // STREAMPARM, not suuported by e-CAM32!
+ public: // STREAMPARM, not suoported by e-CAM32!
     void readStreamparm();
 
     /**
@@ -296,6 +306,12 @@ class CamConfig
  public: // REQUEST IMAGE
      
     void initRequesting();
+    
+    /**
+     * Uses select() to check if an image is available.
+     */
+    bool isImageAvailable(int32_t timeout_ms);
+    
     /**
      * Used http://www.jayrambhia.com/blog/capture-v4l2
      * \param blocking_read Not used, function always waits timeout_ms milliseconds.
@@ -323,7 +339,8 @@ class CamConfig
     std::set<uint32_t> mAutoManualDependentControlIds;
     // Points to the image which has been requested via ioctl.
     uint8_t* mmapBuffer;
-    bool streamingActivated;
+    bool mStreamingActivated;
+    bool mConversionRequiredYUYV2RGB; // YUVU is not yet supported by Rock.
 
     CamConfig() {}
     

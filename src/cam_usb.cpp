@@ -1,7 +1,5 @@
 #include "cam_usb.h"
 
-#include "helpers.h"
-
 namespace camera 
 {
 
@@ -99,7 +97,7 @@ bool CamUsb::close() {
 
 bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
     LOG_DEBUG("CamUsb: grab");
-   
+    
     //check if someone tries to change the grab mode during grabbing
     if(act_grab_mode_ != Stop && mode != Stop) {
         if(act_grab_mode_ != mode)
@@ -124,6 +122,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
             changeCameraMode(CAM_USB_V4L2);
             mCamConfig->initRequesting();
             image_request_started = true;
+            break;
         }
         case MultiFrame:
         case Continuously: {
@@ -137,9 +136,11 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
             image_request_started = mCamGst->startPipeline();
             mReceivedFrameCounter = 0;
             act_grab_mode_ = mode;
+            break;
         }
-        default: 
+        default: {
             throw std::runtime_error("The grab mode is not supported by the camera!");
+        }
     }
     
     if(image_request_started) {
@@ -151,7 +152,7 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
 
 bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout) {
     LOG_DEBUG("CamUsb: retrieveFrame");
-
+    
     if(mCamMode == CAM_USB_NONE) {
         LOG_INFO("Frame can not be retrieved, current camera mode is %d", mCamMode);
         return false;
@@ -170,7 +171,6 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
             return false;
         }   
     } else if(mCamMode == CAM_USB_GST) {
-        
         if(!mCamGst->isPipelineRunning()) {
             LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
             return false;
@@ -203,29 +203,31 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
 }
 
 bool CamUsb::storeFrame(base::samples::frame::Frame& frame, std::string const& file_name) {
-    return mCamGst->storeImageToFile(frame.image, file_name);
+    return Helpers::storeImageToFile(frame.image, file_name);
 }
 
 bool CamUsb::isFrameAvailable() {
     LOG_DEBUG("CamUsb: isFrameAvailable");
 
-    if(mCamMode != CAM_USB_GST) {
-        LOG_INFO("Cant check whether a frame is available, current camera mode is %d", mCamMode);
-        return false;
+    if(mCamMode == CAM_USB_GST) {
+       return mCamGst->hasNewBuffer();
+    } else {
+        return true;
+        //return mCamConfig->isImageAvailable(2000);
     }
-
-    return mCamGst->hasNewBuffer();
 }
 
 int CamUsb::skipFrames() {
     LOG_DEBUG("CamUsb: skipFrames");
 
-    if(mCamMode != CAM_USB_GST) {
-        LOG_INFO("Frame can not be skipped, current camera mode is %d", mCamMode);
-        return false;
+    if(mCamMode == CAM_USB_GST) {
+        return mCamGst->skipBuffer() ? 1 : 0;
+    } else if(mCamMode == CAM_USB_V4L2) {
+        LOG_INFO("Frame skipping is not availabl in V4L2 mode.");
+        return 1;
     }
-
-    return mCamGst->skipBuffer() ? 1 : 0;
+    
+    return 1;
 }
 
 bool CamUsb::setIpSettings(const CamInfo &cam, const IPSettings &ip_settings)const {
@@ -548,7 +550,16 @@ bool CamUsb::setFrameSettings(  const base::samples::frame::frame_size_t size,
 
     LOG_DEBUG("color_depth is set to %d", (int)color_depth);
 
-    mCamConfig->writeImagePixelFormat(size.width, size.height); // use V4L2_PIX_FMT_YUV420?
+    // Hack: If RGB is requested and not available on the camera, YUYV will be 
+    // used and internally converted to RGB.
+    uint32_t v4l2_image_format = mCamConfig->toV4L2ImageFormat(mode);
+    if(v4l2_image_format == 0) {
+        LOG_INFO("Frame mode not available on the camera, using default camera mode.");
+        LOG_INFO("v4l2 image requesting will probably support an unexpeted format");
+        mCamConfig->writeImagePixelFormat(size.width, size.height);
+    } else {
+        mCamConfig->writeImagePixelFormat(size.width, size.height, v4l2_image_format); // use V4L2_PIX_FMT_YUV420?
+    }
     uint32_t width = 0, height = 0;
     mCamConfig->getImageWidth(&width);
     mCamConfig->getImageHeight(&height);

@@ -4,7 +4,8 @@ namespace camera
 {
  
 CamConfig::CamConfig(std::string const& device) : mFd(0), mCapability(), mCamCtrls(), 
-            mFormat(), mCropcap(), mFormatDescriptions(), mStreamparm(), mmapBuffer(NULL), streamingActivated(false) {
+            mFormat(), mCropcap(), mFormatDescriptions(), mStreamparm(), mmapBuffer(NULL), 
+            mStreamingActivated(false), mConversionRequiredYUYV2RGB(false) {
     LOG_DEBUG("CamConfig: constructor");
     
     memset(&mCapability, 0, sizeof(struct v4l2_capability));
@@ -909,6 +910,48 @@ bool CamConfig::getImageColorspace(uint32_t* colorspace) {
     return true;
 }
 
+uint32_t CamConfig::toV4L2ImageFormat(base::samples::frame::frame_mode_t mode) {
+    using namespace base::samples::frame;
+    // TODO: Do sth clever with the collected mFormatDescriptions.
+    uint32_t v4l2_mode = 0;
+    switch(mode) {
+        case MODE_GRAYSCALE: v4l2_mode = V4L2_PIX_FMT_GREY; break; 
+        case MODE_RGB: v4l2_mode  = V4L2_PIX_FMT_RGB24; break; 
+        case MODE_BGR: v4l2_mode  = V4L2_PIX_FMT_BGR24; break; 
+        case MODE_RGB32: v4l2_mode = V4L2_PIX_FMT_RGB32; break; 
+        case MODE_UYVY: v4l2_mode  = V4L2_PIX_FMT_UYVY; break; 
+        case MODE_JPEG: v4l2_mode  = V4L2_PIX_FMT_MJPEG; break;  //V4L2_PIX_FMT_JPEG;
+        default: break;
+    }
+    
+    // Problem: The few rock image formats cannot cover all the v4l2 formats.
+    // And we do not have conversions for most of the camera formats like YUYV or H264.
+    // So for now for frame mode RGB we have to:
+    // 1. Request YUV images. 
+    // 2. Convert the image manually to RBG.
+    // 3. Now the frame helper can compress the image to JPEG.
+    bool yuyv_available = false;
+    std::vector<struct v4l2_fmtdesc>::iterator it = mFormatDescriptions.begin();
+    for(; it != mFormatDescriptions.end(); it++) {
+        if(it->pixelformat == v4l2_mode) {
+            printf("Returns mode %d\n", v4l2_mode);
+            return v4l2_mode;
+        }
+        if(it->pixelformat == V4L2_PIX_FMT_YUYV) {
+            yuyv_available = true;
+        }
+    }
+    
+    // If the requested mode (which is not available) is RGB and the camera got 
+    // the YUYV format, we will use that and do an extra to RGB conversion.
+    if(mode == MODE_RGB && yuyv_available) {
+        mConversionRequiredYUYV2RGB = true;
+        return V4L2_PIX_FMT_YUYV;
+    }
+    
+    return 0;
+}
+
 // STREAMPARM
 void CamConfig::readStreamparm() {
     LOG_DEBUG("CamConfig: readStreamparm");
@@ -1097,71 +1140,10 @@ void CamConfig::initRequesting() {
         throw std::runtime_error(err_str.insert(0, "Could not start capturing: "));
     }
     
-    streamingActivated = true;
+    mStreamingActivated = true;
 }
-    
-/**
-    * Used http://www.jayrambhia.com/blog/capture-v4l2
-    * \param blocking_read Not used, function always waits timeout_ms milliseconds.
-    */
-bool CamConfig::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int32_t timeout_ms) {
-    
-    struct v4l2_buffer q_buffer = {0};
-    q_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    q_buffer.memory = V4L2_MEMORY_MMAP;
-    q_buffer.index = 0;
-    if(-1 == xioctl(mFd, VIDIOC_QBUF, &q_buffer))
-    {
-        perror("Query Buffer");
-        return false;
-    }
- 
-    /*if(-1 == xioctl(mFd, VIDIOC_STREAMON, &buf.type))
-    {
-        perror("Start Capture");
-        return false;
-    }
- 
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(mFd, &fds);
-    struct timeval tv = {0};
-    tv.tv_sec = 2;
-    int r = select(mFd+1, &fds, NULL, NULL, &tv);
-    if(-1 == r)
-    {
-        perror("Waiting for Frame");
-        return false;
-    }
-    
-    printf("Before retrieve\n"); 
-    if(-1 == xioctl(mFd, VIDIOC_DQBUF, &buf))
-    {
-        printf("Error retrieve\n");
-        perror("Retrieving Frame");
-        return false;
-    }
 
-    // Image is available at mmapBuffer now.
-    std::cout << "buf.length: " << buf.length << std::endl;
-    buffer.resize(buf.length);
-    memcpy(buffer.data(), mmapBuffer, buf.length);
-    
-    printf ("saving image\n");*/
-    
-    
-    // Query buffer.
-   // struct v4l2_buffer query_buffer;
-//	getQueryBuffer(query_buffer);
-
-	// Start streaming. Streaming must only be started once!
-	/*
-    if(xioctl(mFd, VIDIOC_STREAMON, &query_buffer.type) == -1){
-        std::string err_str(strerror(errno));
-        throw std::runtime_error(err_str.insert(0, "Could not start capturing: "));
-    }*/
-    
-    // Wait for an image.
+bool CamConfig::isImageAvailable(int32_t timeout_ms) {
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(mFd, &fds);
@@ -1183,31 +1165,54 @@ bool CamConfig::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int3
         return false;
     }
     
-    std::cout << "length buffer " << q_buffer.length << std::endl;
+    return true;
+}
     
-   // if(!(q_buffer.flags & (V4L2_BUF_FLAG_QUEUED | V4L2_BUF_FLAG_DONE))) { // does not help
+/**
+    * Used http://www.jayrambhia.com/blog/capture-v4l2
+    * \param blocking_read Not used, function always waits timeout_ms milliseconds.
+    */
+bool CamConfig::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int32_t timeout_ms) {
     
-        // Data available, resize the passed buffer and copy the image.
-        // By default VIDIOC_DQBUF blocks when no buffer is in the outgoing queue. 
-        // When the O_NONBLOCK flag was given to the open() function, VIDIOC_DQBUF returns 
-        // immediately with an EAGAIN error code when no buffer is available.
+    struct v4l2_buffer q_buffer = {0};
+    q_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    q_buffer.memory = V4L2_MEMORY_MMAP;
+    q_buffer.index = 0;
+    if(-1 == xioctl(mFd, VIDIOC_QBUF, &q_buffer))
+    {
+        perror("Query Buffer");
+        return false;
+    }
+ 
+    // Wait for an image.
+    // getBuffer is only called if an image is available (using isImageAvailable()).
+    // TODO remove?
+    if(!isImageAvailable(timeout_ms)) {
+        return false;
+    }
+    
+    // Data available, resize the passed buffer and copy the image.
+    // By default VIDIOC_DQBUF blocks when no buffer is in the outgoing queue. 
+    // When the O_NONBLOCK flag was given to the open() function, VIDIOC_DQBUF returns 
+    // immediately with an EAGAIN error code when no buffer is available.
+    if(xioctl(mFd, VIDIOC_DQBUF, &q_buffer) == -1) {
+        std::string err_str(strerror(errno));
+        throw std::runtime_error(err_str.insert(0, "Error capturing the image: "));
+    }
+    
+    // Image is available at mmapBuffer now.
+    if(mConversionRequiredYUYV2RGB) {
+        Helpers::convertYUYV2RGB(mmapBuffer, q_buffer.length, buffer);
+    } else {
         buffer.resize(q_buffer.length);
-        if(xioctl(mFd, VIDIOC_DQBUF, &q_buffer) == -1) {
-            std::string err_str(strerror(errno));
-            throw std::runtime_error(err_str.insert(0, "Error capturing the image: "));
-        }
-        
-        // Image is available at mmapBuffer now.
         memcpy(buffer.data(), mmapBuffer, q_buffer.length);
-    //} else {
-    //    std::cout << "V4L2_BUF_FLAG_QUEUED | V4L2_BUF_FLAG_DONE" << std::endl;
-    //}
+    }
     
     return true;
 }
 
 void CamConfig::cleanupRequesting() {
-    if(!streamingActivated) {
+    if(!mStreamingActivated) {
         LOG_INFO("v4l2 streaming is not active, no cleanup required");
         return;
     }
@@ -1229,7 +1234,7 @@ void CamConfig::cleanupRequesting() {
     }
     mmapBuffer = NULL;
     
-    streamingActivated = false;
+    mStreamingActivated = false;
 }
 
 void CamConfig::getQueryBuffer(struct v4l2_buffer& query_buffer) {
