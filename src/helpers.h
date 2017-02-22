@@ -24,6 +24,26 @@ namespace camera
 class Helpers {
  public:
     /**
+     * Creates YUV2RGB lookup tables.
+     */
+    Helpers() {
+        for(int v=0; v<256; ++v) {
+             lookup_v2r[v] = ( (v-128) * 37221 ) >> 15;
+        }
+        
+        for(int u=0; u<256; ++u) {
+            for(int v=0; v<256; ++v) {
+                lookup_uv2g[u][v] = ( ((u-128) * 12975) + ((v-128) * 18949) ) >> 15;
+            }
+        }
+
+        for(int u=0; u<256; ++u) {
+             lookup_u2b[u] = ((u-128) * 66883) >> 15;
+        }
+
+    }
+
+    /**
      * Someone (OpenCV?) does not understand JPEG comment-blocks.
      * Removes comment block to avoid getting 
      * 'Corrupt JPEG data: x extraneous bytes before marker 0xe0.'
@@ -50,7 +70,6 @@ class Helpers {
         }
     } 
     
-    
     static bool storeImageToFile(std::vector<uint8_t> const& buffer, std::string const& file_name) {
         LOG_DEBUG("storeImageToFile, buffer contains %d bytes, stores to %s", 
                 buffer.size(), file_name.c_str());
@@ -76,23 +95,22 @@ class Helpers {
         return true;
     }
     
-    static uint8_t clip(int value) {
+    uint8_t clip(int value) {
         if(value < 0)
             return 0;
         if(value > 255)
             return 255;
         return value;
     }
-    
-    static void convertYUYVPixel(uint8_t y, uint8_t u, uint8_t v, 
-                                 uint8_t& r, uint8_t& g, uint8_t& b) {
-        int y2 = (int)y;
-        int u2 = (int)u - 128;
-        int v2 = (int)v - 128;
 
-        int r2 = y2 + ((v2 * 37221) >> 15);
-        int g2 = y2 - (((u2 * 12975) + (v2 * 18949)) >> 15);
-        int b2 = y2 + ((u2 * 66883) >> 15);
+    void convertYUYVPixel(uint8_t y, uint8_t u, uint8_t v, 
+                          uint8_t& r, uint8_t& g, uint8_t& b) {
+                              
+        int y2 = (int)y;
+
+        int r2 = y2 + lookup_v2r[(int)v]; // ((v2 * 37221) >> 15);
+        int g2 = y2 - lookup_uv2g[(int)u][(int)v];  // (((u2 * 12975) + (v2 * 18949)) >> 15);
+        int b2 = y2 + lookup_u2b[(int)u];      // ((u-128) * 66883) >> 15
 
         // Cap the values.
         r = clip(r2);
@@ -100,8 +118,15 @@ class Helpers {
         b = clip(b2);
     }
     
-    // https://www.fourcc.org/fccyvrgb.php#mikes_answer, further informations.
-    static void convertYUYV2RGB(uint8_t* yuyv_data, 
+    /**
+     * Converts an YUYV image to RGB24.
+     * \param yuyv_data Pointer to the YUV data. Four bytes are two pixels, U and V belong
+     * to both Ys: YUY'V forms YUV and Y'UV. Ranges on the test system: Y[0,255] U[0,218] V[0,254]
+     * \param yuyv_data_length Number of bytes of yuyv_data. Divides by 2 is the number of pixels.
+     * \param rgb_buffer Buffer which will receive the RGB pixels.
+     * http://stackoverflow.com/questions/37561461/how-to-convert-yuyv-to-rgb-code-to-yuv420-to-rgb
+     */
+    void convertYUYV2RGB(uint8_t* yuyv_data, 
                                 size_t yuyv_data_length, 
                                 std::vector<uint8_t>& rgb_buffer) {
         
@@ -138,6 +163,11 @@ class Helpers {
             *it = b; it++;
         }
     }
+
+ private:
+    int lookup_v2r[256];
+    int lookup_uv2g[256][256];
+    int lookup_u2b[256];
 };
 
 } // end namespace camera

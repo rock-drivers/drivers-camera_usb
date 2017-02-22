@@ -771,12 +771,17 @@ void CamConfig::writeImagePixelFormat(uint32_t const width, uint32_t const heigh
     
     // Suggest the new format and fill mFormat with the actual one the driver choosed.
     if(xioctl(mFd, VIDIOC_S_FMT, &mFormat) == -1) {
-        std::string err_str(strerror(errno));
+        std::stringstream ss;
+        std::string err_str = strerror(errno);
         if(errno == EINVAL) {
             throw CamConfigException(err_str.insert(0, 
                     "VIDIOC_S_FMT is not supported by device driver: "));
         }
-        throw std::runtime_error(err_str.insert(0, "Could not write image format: "));
+        LOG_ERROR("Image format width %d, height %d, pixelformat %d\n", width, height, pixelformat);
+        ss << "Could not write image format (width: " << width << ", height: " << 
+                height << ", pixelformat: " << pixelformat << "): ";
+        ss << err_str;
+        throw std::runtime_error(ss.str());
     }
 }
 
@@ -1202,7 +1207,7 @@ bool CamConfig::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read, int3
     
     // Image is available at mmapBuffer now.
     if(mConversionRequiredYUYV2RGB) {
-        Helpers::convertYUYV2RGB(mmapBuffer, q_buffer.length, buffer);
+        helpers.convertYUYV2RGB(mmapBuffer, q_buffer.length, buffer);
     } else {
         buffer.resize(q_buffer.length);
         memcpy(buffer.data(), mmapBuffer, q_buffer.length);

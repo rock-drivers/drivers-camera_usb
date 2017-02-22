@@ -341,6 +341,7 @@ class CamConfig
     uint8_t* mmapBuffer;
     bool mStreamingActivated;
     bool mConversionRequiredYUYV2RGB; // YUVU is not yet supported by Rock.
+    Helpers helpers;
 
     CamConfig() {}
     
