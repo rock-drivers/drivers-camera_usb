@@ -71,12 +71,15 @@ int main(int argc, char* argv[])
     std::cout << "Device: " << device << std::endl;
     
     
-    // Start conversion test
+    // Start conversion and exposure test
     /*
     CamUsb cam(device);
     std::vector<CamInfo> cam_info;
     cam.listCameras(cam_info);
     cam.open(cam_info[0]);
+    bool ret1 = cam.setAttrib(camera::enum_attrib::ExposureModeToManual);
+    bool ret2 = cam.setAttrib(camera::int_attrib::ExposureValue, 7000);
+    printf("Set exposure to manuel %s, set value %s\n", ret1 ? "true" : "false",  ret2 ? "true" : "false");
     const base::samples::frame::frame_size_t size(640, 480);
     cam.setFrameSettings(size, base::samples::frame::MODE_RGB, 3);
     cam.grab();
@@ -85,7 +88,7 @@ int main(int argc, char* argv[])
     cam.retrieveFrame(frame, 2000);
     return 0;
     */
-    // End conversion test
+    // End conversion and exposure test
     
     
     

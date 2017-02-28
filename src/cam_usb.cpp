@@ -9,7 +9,6 @@ CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamC
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
     LOG_DEBUG("CamUsb: constructor");
     mDevice = device;
-    createAttrsCtrlMaps();
     changeCameraMode(CAM_USB_NONE);
 }
 
@@ -318,15 +317,31 @@ bool CamUsb::setAttrib(const enum_attrib::CamAttrib attrib) {
             break;
         }
         case enum_attrib::PowerLineFrequencyDisabled: {
-            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 0);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_DISABLED);
             break;
         }
         case enum_attrib::PowerLineFrequencyTo50: {
-            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 1);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_50HZ);
             break;
         }
         case enum_attrib::PowerLineFrequencyTo60: {
-            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, 2);
+            mCamConfig->writeControlValue(V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_60HZ);
+            break;
+        }
+        case enum_attrib::ExposureModeToAuto: {
+            uint32_t id = V4L2_EXPOSURE_AUTO;
+            if(!mCamConfig->isControlIdValid(id)) {
+                id = V4L2_CID_EXPOSURE_AUTO_PRIORITY;
+            }
+            mCamConfig->writeControlValue(id, V4L2_EXPOSURE_AUTO);
+            break;
+        }
+        case enum_attrib::ExposureModeToManual: {
+            uint32_t id = V4L2_EXPOSURE_AUTO;
+            if(!mCamConfig->isControlIdValid(id)) {
+                id = V4L2_CID_EXPOSURE_AUTO_PRIORITY;
+            }
+            mCamConfig->writeControlValue(id, V4L2_EXPOSURE_MANUAL);
             break;
         }
         // attribute unknown or not supported (yet)
@@ -397,6 +412,11 @@ bool CamUsb::isAttribAvail(const enum_attrib::CamAttrib attrib) {
         case enum_attrib::PowerLineFrequencyTo50:
         case enum_attrib::PowerLineFrequencyTo60: {
             return mCamConfig->isControlIdValid(V4L2_CID_POWER_LINE_FREQUENCY);
+        }
+        case enum_attrib::ExposureModeToAuto:
+        case enum_attrib::ExposureModeToManual: {
+            return mCamConfig->isControlIdValid(V4L2_CID_EXPOSURE_AUTO_PRIORITY) || 
+                mCamConfig->isControlIdValid(V4L2_EXPOSURE_AUTO);
         }
         // attribute unknown or not supported (yet)
         default:
@@ -478,6 +498,16 @@ bool CamUsb::isAttribSet(const enum_attrib::CamAttrib attrib) {
         case enum_attrib::PowerLineFrequencyTo60:
              mCamConfig->getControlValue(V4L2_CID_POWER_LINE_FREQUENCY, &value); 
             return value == 2;
+        case enum_attrib::ExposureModeToAuto:
+            if(!mCamConfig->getControlValue(V4L2_CID_EXPOSURE_AUTO_PRIORITY, &value)) {
+                mCamConfig->getControlValue(V4L2_EXPOSURE_AUTO, &value);
+            }
+            return value == V4L2_EXPOSURE_AUTO;
+        case enum_attrib::ExposureModeToManual:
+             if(!mCamConfig->getControlValue(V4L2_CID_EXPOSURE_AUTO_PRIORITY, &value)) {
+                mCamConfig->getControlValue(V4L2_EXPOSURE_AUTO, &value);
+            }
+            return value == V4L2_EXPOSURE_MANUAL;
         // attribute unknown or not supported (yet)
         default:
             throw std::runtime_error("Unknown attribute");
@@ -649,16 +679,22 @@ int CamUsb::getFileDescriptor() const {
     return fd;
 }
 
-void CamUsb::createAttrsCtrlMaps() {
+void CamUsb::createAttrsCtrlMaps(CamConfig* cam_config) {
     LOG_DEBUG("CamUsb: createAttrsCtrlMaps");
     
     typedef std::pair<int_attrib::CamAttrib, int> ac_int;
+    mMapAttrsCtrlsInt.clear();
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::BrightnessValue,V4L2_CID_BRIGHTNESS));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::ContrastValue,V4L2_CID_CONTRAST));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::SaturationValue,V4L2_CID_SATURATION));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::WhitebalValue,V4L2_CID_WHITE_BALANCE_TEMPERATURE));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::SharpnessValue,V4L2_CID_SHARPNESS));
     mMapAttrsCtrlsInt.insert(ac_int(int_attrib::BacklightCompensation,V4L2_CID_BACKLIGHT_COMPENSATION));
+    uint32_t valid_exposure_id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    if(!cam_config->isControlIdValid(valid_exposure_id)) {
+        valid_exposure_id = V4L2_CID_EXPOSURE;
+    }
+    mMapAttrsCtrlsInt.insert(ac_int(int_attrib::ExposureValue,valid_exposure_id));
 }
 
 void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
@@ -689,6 +725,7 @@ void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
             LOG_INFO("Camera configuration mode via v4l2 activated");
             mCamConfig = new CamConfig(mDevice);
             mCamMode = CAM_USB_V4L2;
+            createAttrsCtrlMaps(mCamConfig);
             break;
         case CAM_USB_GST:
             LOG_INFO("Camera image transfer mode via gst activated");

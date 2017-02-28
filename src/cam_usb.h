@@ -355,7 +355,7 @@ class CamUsb : public CamInterface {
     void (*mpCallbackFunction)(const void* p);
     void* mpPassThroughPointer;
 
-    void createAttrsCtrlMaps();
+    void createAttrsCtrlMaps(CamConfig* cam_config);
 };
 
 } // end namespace camera
