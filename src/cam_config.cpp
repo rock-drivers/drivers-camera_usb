@@ -939,7 +939,6 @@ uint32_t CamConfig::toV4L2ImageFormat(base::samples::frame::frame_mode_t mode) {
     std::vector<struct v4l2_fmtdesc>::iterator it = mFormatDescriptions.begin();
     for(; it != mFormatDescriptions.end(); it++) {
         if(it->pixelformat == v4l2_mode) {
-            printf("Returns mode %d\n", v4l2_mode);
             return v4l2_mode;
         }
         if(it->pixelformat == V4L2_PIX_FMT_YUYV) {
@@ -988,6 +987,7 @@ void CamConfig::writeStreamparm(uint32_t const numerator, uint32_t const denomin
         throw CamConfigException("FPS-setting not supported by device driver.");
     }
 
+    // timeperframe: Time between images in seconds: numerator(1) / denominator.
     if(numerator != 0)
         mStreamparm.parm.capture.timeperframe.numerator = numerator;
     else
@@ -1038,38 +1038,33 @@ void CamConfig::listStreamparm() {
     printf("\n");
 }
 
-bool CamConfig::readFPS(uint32_t* fps) {
+bool CamConfig::readFPS(float* fps) {
     readStreamparm();
 
     uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
     uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
     
     if(n == 0) {
-        LOG_INFO("Numerator is 0, fps 0 is returned");
+        LOG_INFO("Returned numerator/denominator are %d/%d, fps 0 will be returned", n, d);
+        *fps = 0;
+    } else {
+        *fps = d/(float)n; // Calculates the frames per second, not the time between the frames.
     }
-
-    *fps = n == 0 ? 0 : d/n;
+    printf("Returned fps %d/%d, %4.2f\n", d, n, *fps);
     return true;
 }
 
 void CamConfig::writeFPS(uint32_t fps) {
     try {
+        // Writes the new framerate and stores the real framerate which is returned by the driver. 
         writeStreamparm(1,fps);
     } catch (CamConfigException& err) {
         LOG_ERROR("writeFPS: %s", err.what());
     }
 }
 
-bool CamConfig::getFPS(uint32_t* fps) {
-    uint32_t n = mStreamparm.parm.capture.timeperframe.numerator;
-    uint32_t d = mStreamparm.parm.capture.timeperframe.denominator;
-    
-    if(n == 0) {
-        LOG_INFO("Numerator is 0, fps 0 is returned");
-    }
-
-    *fps = n == 0 ? 0 : d/n;
-    return true;
+bool CamConfig::getFPS(float* fps) {
+    return readFPS(fps);
 }
 
 bool CamConfig::hasCapabilityStreamparm(uint32_t capability_field) {

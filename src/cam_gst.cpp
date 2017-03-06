@@ -294,9 +294,15 @@ void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fp
     CamConfig config(mDevice);
 
     // Take the last used values if parameter is 0.
-    if(*width == 0) config.getImageWidth(width);
-    if(*height == 0) config.getImageHeight(height);
-    if(*fps == 0) config.getFPS(fps);
+    float fps_float;
+    if(*width == 0) 
+        config.getImageWidth(width);
+    if(*height == 0) 
+        config.getImageHeight(height);
+    if(*fps == 0) {
+        config.getFPS(&fps_float);
+        *fps = (uint32_t)fps_float; 
+    }
 
     config.writeImagePixelFormat(*width, *height);
     config.writeFPS(*fps);
@@ -304,7 +310,8 @@ void CamGst::setCameraParameters(uint32_t* width, uint32_t* height, uint32_t* fp
     // Get the actual parameters set by the driver.
     config.getImageWidth(width);
     config.getImageHeight(height);
-    config.getFPS(fps);
+    config.getFPS(&fps_float);
+    *fps = (uint32_t)fps_float; 
     LOG_INFO("Set camera parameters: width %d, height %d, fps %d", *width, *height, *fps); 
 }
 

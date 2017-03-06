@@ -270,11 +270,11 @@ bool CamUsb::setAttrib(const double_attrib::CamAttrib attrib, const double value
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
             mCamConfig->writeFPS((uint32_t)value);
-            uint32_t cam_fps_tmp = 0;
+            float cam_fps_tmp = 0;
             mCamConfig->readFPS(&cam_fps_tmp);
-            if((uint32_t)value != cam_fps_tmp) {
-                LOG_WARN("Written (%d) and read (%d) FPS differ, %d will be used", 
-                         (uint32_t)value, cam_fps_tmp, cam_fps_tmp);
+            if(1/(float)value != cam_fps_tmp) {
+                LOG_WARN("Written (%4.2f) and read (%4.2f) FPS differ, read value will be used", 
+                         1/(float)value, cam_fps_tmp);
             }
             mFps = cam_fps_tmp;
             break;
@@ -383,7 +383,8 @@ bool CamUsb::isAttribAvail(const double_attrib::CamAttrib attrib) {
 
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            return mCamConfig->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME);
+            bool ret = mCamConfig->hasCapabilityStreamparm(V4L2_CAP_TIMEPERFRAME);
+            return ret;
         }
         default:
             return false;
@@ -457,9 +458,8 @@ double CamUsb::getAttrib(const double_attrib::CamAttrib attrib) {
     switch(attrib) {
         case double_attrib::FrameRate:
         case double_attrib::StatFrameRate: {
-            uint32_t fps;
-            mCamConfig->readFPS(&fps);
-            mFps = (double)fps;
+            // Just returns the stored framerate, which has been requested in setAttrib().
+            mCamConfig->readFPS(&mFps);
             return mFps;
         }
         default:

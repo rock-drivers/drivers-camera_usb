@@ -346,7 +346,7 @@ class CamUsb : public CamInterface {
 
     // Framerate set on the camera internally. If available it will set to > 0 during startup.
     // Will be set if the pipeline is not running and the fps of the camera is requested.
-    double mFps;
+    float mFps;
     int mBpp;
     timeval mStartTimeGrabbing;
     int mReceivedFrameCounter;

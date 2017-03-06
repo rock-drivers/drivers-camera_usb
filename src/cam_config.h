@@ -274,7 +274,7 @@ class CamConfig
     /**
      * 
      */
-    bool readFPS(uint32_t* fps);
+    bool readFPS(float* fps);
 
     /**
      * Tries to set the passed fps, just use writeStreamparm(1,fps).
@@ -289,7 +289,7 @@ class CamConfig
      * \param fps Sets fps to 0 if not set.
      * \return Always true.
      */
-    bool getFPS(uint32_t* fps);
+    bool getFPS(float* fps);
 
     /** 
      * Only supported flag: V4L2_CAP_TIMEPERFRAME (is it allowd
