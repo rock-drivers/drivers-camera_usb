@@ -1050,7 +1050,7 @@ bool CamConfig::readFPS(float* fps) {
     } else {
         *fps = d/(float)n; // Calculates the frames per second, not the time between the frames.
     }
-    printf("Returned fps %d/%d, %4.2f\n", d, n, *fps);
+    LOG_INFO("Returned fps %d/%d, %4.2f\n", d, n, *fps);
     return true;
 }
 
