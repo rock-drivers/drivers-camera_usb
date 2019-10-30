@@ -21,7 +21,7 @@
 
 #include "camera_interface/CamInterface.h"
 
-#include "cam_gst.h"
+
 #include "cam_config.h"
 
 namespace camera 
@@ -333,7 +333,7 @@ class CamUsb : public CamInterface {
      */
     void changeCameraMode(enum CAM_USB_MODE cam_usb_mode);
 
-    CamGst* mCamGst;
+    //CamGst* mCamGst;
     CamConfig* mCamConfig;
     std::string mDevice;
 

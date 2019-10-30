@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
     int ret = 0;
     CamMenu cam_menu = MAIN;
     CamConfig* cam_config = NULL;
-    CamGst* cam_gst = NULL;
+    // CamGst* cam_gst = NULL;
     std::vector<uint8_t> buffer;
     
     int numImagesToRequest = 100;
@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
                     }
                     case 2: {
                         cam_menu = IMAGE_REQUESTING;
-                        cam_gst = new CamGst(device);
+                        // cam_gst = new CamGst(device);
                         break;
                     }
                     case 3: {
@@ -204,35 +204,35 @@ int main(int argc, char* argv[])
                 ret = getRequest(1, 3);
                 switch(ret) {
                     case 1: {
-                        cam_gst->createDefaultPipeline(true, 640, 480, 30, 24, base::samples::frame::MODE_JPEG, 80);
-                        cam_gst->startPipeline();
+                        // cam_gst->createDefaultPipeline(true, 640, 480, 30, 24, base::samples::frame::MODE_JPEG, 80);
+                        // cam_gst->startPipeline();
                         
-                        timeval start_time;
-                        gettimeofday(&start_time, 0);
+                        // timeval start_time;
+                        // gettimeofday(&start_time, 0);
                         
-                        for(int i=0; i<numImagesToRequest; i++) {
-                            if(!cam_gst->getBuffer(buffer, true, 2000)) {
-                                std::cout << "Image could not be requested" << std::endl;
-                            } else {
-                                std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
-                            }
+                        // for(int i=0; i<numImagesToRequest; i++) {
+                        //     if(!cam_gst->getBuffer(buffer, true, 2000)) {
+                        //         std::cout << "Image could not be requested" << std::endl;
+                        //     } else {
+                        //         std::cout << "Image requested (" << buffer.size() << " bytes)" << std::endl;
+                        //     }
                             
-                            /*
-                            cv::Mat test = cv::imdecode(buffer, CV_LOAD_IMAGE_COLOR);
-                            if (test.empty() == true) {
-                                std::cout << "Empty image: problem to decode the buffer." << std::endl;
-                            }
-                            frame = test.clone();
-                            cv::imshow("window", frame);
-                            //cv::waitKey(10); // Does not work with GStreamer?
-                            */
-                        }
+                        //     /*
+                        //     cv::Mat test = cv::imdecode(buffer, CV_LOAD_IMAGE_COLOR);
+                        //     if (test.empty() == true) {
+                        //         std::cout << "Empty image: problem to decode the buffer." << std::endl;
+                        //     }
+                        //     frame = test.clone();
+                        //     cv::imshow("window", frame);
+                        //     //cv::waitKey(10); // Does not work with GStreamer?
+                        //     */
+                        // }
                         
-                        cam_gst->stopPipeline();
-                        cam_gst->deletePipeline();
+                        // cam_gst->stopPipeline();
+                        // cam_gst->deletePipeline();
                         
-                        double fps = calculate_fps(start_time, numImagesToRequest); 
-                        std::cout << "FPS: " << fps << std::endl;
+                        // double fps = calculate_fps(start_time, numImagesToRequest); 
+                        // std::cout << "FPS: " << fps << std::endl;
                         break;
                     }
                     case 2: {
@@ -246,8 +246,8 @@ int main(int argc, char* argv[])
                     }
                     case 3: {
                         cam_menu = MAIN;
-                        delete cam_gst;
-                        cam_gst = NULL;
+                        //delete cam_gst;
+                        //cam_gst = NULL;
                         break;
                     }
                 }

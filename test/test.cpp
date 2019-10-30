@@ -4,7 +4,7 @@
 //BOOST_AUTO_TEST_SUITE(camera_usb__test_suite)
 
 #include "v4l2_test.h"
-#include "gst_test.h"
+//#include "gst_test.h"
 #include "restart_test.h"
 #include "usb_test.h"
 

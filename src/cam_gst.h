@@ -15,9 +15,9 @@
 #ifndef _CAM_GST_CONFIG_H_
 #define _CAM_GST_CONFIG_H_
 
-#include <glib.h>
-#include <gst/app/gstappsink.h>
-#include <gst/gst.h>
+// #include <glib.h>
+// #include <gst/app/gstappsink.h>
+// #include <gst/gst.h>
 
 #include <pthread.h>
 #include <stdio.h>
@@ -223,18 +223,19 @@ class CamGst {
  private:
     std::string mDevice;
     uint32_t mJpegQuality;
-    GMainLoop* mLoop;
+    
+    // GMainLoop* mLoop;
     pthread_t* mMainLoopThread;
-    GstElement* mPipeline;
-    GstBus* mGstPipelineBus;
+    // GstElement* mPipeline;
+    // GstBus* mGstPipelineBus;
     bool mPipelineRunning;
 
     pthread_mutex_t mMutexBuffer;
-    GstBuffer* mBuffer;
+    // GstBuffer* mBuffer;
     uint32_t mBufferSize;
     bool mNewBuffer;
 
-    GstElement* mSource; // Used to request the fd.
+    // GstElement* mSource; // Used to request the fd.
     int mFileDescriptor; // File descriptor of the pipeline source. -1 if not available.
     
     base::samples::frame::frame_mode_t mRequestedFrameMode;

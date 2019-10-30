@@ -3,7 +3,7 @@
 namespace camera 
 {
 
-CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamGst(NULL), mCamConfig(NULL),
+CamUsb::CamUsb(std::string const& device) : CamInterface(), mCamConfig(NULL),
         mDevice(), mIsOpen(false), mCamInfo(), mMapAttrsCtrlsInt(), mFps(10),
         mBpp(24), mStartTimeGrabbing(), mReceivedFrameCounter(0),
         mpCallbackFunction(NULL), mpPassThroughPointer(NULL) {
@@ -125,16 +125,16 @@ bool CamUsb::grab(const GrabMode mode, const int buffer_len) {
         }
         case MultiFrame:
         case Continuously: {
-            changeCameraMode(CAM_USB_GST);
-             // If one of the parameters is 0, the current setting of the camera is used.
-            mCamGst->createDefaultPipeline(true,
-                    image_size_.width, image_size_.height,
-                    (uint32_t)mFps, (uint32_t)mBpp,
-                    image_mode_);
+            // changeCameraMode(CAM_USB_GST);
+            //  // If one of the parameters is 0, the current setting of the camera is used.
+            // mCamGst->createDefaultPipeline(true,
+            //         image_size_.width, image_size_.height,
+            //         (uint32_t)mFps, (uint32_t)mBpp,
+            //         image_mode_);
             
-            image_request_started = mCamGst->startPipeline();
-            mReceivedFrameCounter = 0;
-            act_grab_mode_ = mode;
+            // image_request_started = mCamGst->startPipeline();
+            // mReceivedFrameCounter = 0;
+            // act_grab_mode_ = mode;
             break;
         }
         default: {
@@ -170,15 +170,15 @@ bool CamUsb::retrieveFrame(base::samples::frame::Frame &frame,const int timeout)
             return false;
         }   
     } else if(mCamMode == CAM_USB_GST) {
-        if(!mCamGst->isPipelineRunning()) {
-            LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
-            return false;
-        }
-        bool success = mCamGst->getBuffer(buffer_tmp, true, timeout);
-        if(!success) {
-            LOG_ERROR("Gstreamer: Buffer could not retrieved.");
-            return false;
-        }
+        // if(!mCamGst->isPipelineRunning()) {
+        //     LOG_WARN("Frame can not be retrieved, because pipeline is not running.");
+        //     return false;
+        // }
+        // bool success = mCamGst->getBuffer(buffer_tmp, true, timeout);
+        // if(!success) {
+        //     LOG_ERROR("Gstreamer: Buffer could not retrieved.");
+        //     return false;
+        // }
     }
     
     // TODO In Frame.hpp getChannelCount() returns 1 for UYVY, should be 2?
@@ -208,23 +208,23 @@ bool CamUsb::storeFrame(base::samples::frame::Frame& frame, std::string const& f
 bool CamUsb::isFrameAvailable() {
     LOG_DEBUG("CamUsb: isFrameAvailable");
 
-    if(mCamMode == CAM_USB_GST) {
-       return mCamGst->hasNewBuffer();
-    } else {
+    // if(mCamMode == CAM_USB_GST) {
+    //    return mCamGst->hasNewBuffer();
+    // } else {
         return true;
         //return mCamConfig->isImageAvailable(2000);
-    }
+    // }
 }
 
 int CamUsb::skipFrames() {
     LOG_DEBUG("CamUsb: skipFrames");
 
-    if(mCamMode == CAM_USB_GST) {
-        return mCamGst->skipBuffer() ? 1 : 0;
-    } else if(mCamMode == CAM_USB_V4L2) {
-        LOG_INFO("Frame skipping is not availabl in V4L2 mode.");
-        return 1;
-    }
+    // if(mCamMode == CAM_USB_GST) {
+    //     return mCamGst->skipBuffer() ? 1 : 0;
+    // } else if(mCamMode == CAM_USB_V4L2) {
+    //     LOG_INFO("Frame skipping is not availabl in V4L2 mode.");
+    //     return 1;
+    // }
     
     return 1;
 }
@@ -672,11 +672,12 @@ int CamUsb::getFileDescriptor() const {
         return -1;
     }
    
-    int fd = mCamGst->getFileDescriptor();
-    if(fd == -1) {
-        LOG_INFO("File descriptor could not be requested, start pipeline with grab() first");
-    }
-    return fd;
+    // int fd = mCamGst->getFileDescriptor();
+    // if(fd == -1) {
+    //     LOG_INFO("File descriptor could not be requested, start pipeline with grab() first");
+    // }
+    // return fd;
+    return -1;
 }
 
 void CamUsb::createAttrsCtrlMaps(CamConfig* cam_config) {
@@ -706,10 +707,10 @@ void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
         return;
     }
 
-    if(mCamGst != NULL) {
-        delete mCamGst;
-        mCamGst = NULL;
-    }
+    // if(mCamGst != NULL) {
+    //     delete mCamGst;
+    //     mCamGst = NULL;
+    // }
 
     if(mCamConfig != NULL) {
         delete mCamConfig;
@@ -728,9 +729,9 @@ void CamUsb::changeCameraMode(enum CAM_USB_MODE cam_usb_mode) {
             createAttrsCtrlMaps(mCamConfig);
             break;
         case CAM_USB_GST:
-            LOG_INFO("Camera image transfer mode via gst activated");
-            mCamGst = new CamGst(mDevice);
-            mCamMode = CAM_USB_GST;
+            // LOG_INFO("Camera image transfer mode via gst activated");
+            // mCamGst = new CamGst(mDevice);
+            // mCamMode = CAM_USB_GST;
             break;
         default:
             LOG_WARN("Unknown cam-mode %d passed, modus will be set to CAM_USB_NONE");
