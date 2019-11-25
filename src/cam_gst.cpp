@@ -30,6 +30,7 @@ CamGst::CamGst(std::string const& device) : mDevice(device),
         mBufferSize(0),
         mNewBuffer(false),
         mSource(NULL),
+        mSample(NULL),
         mFileDescriptor(-1),
         mRequestedFrameMode(MODE_UNDEFINED)
 {
@@ -52,6 +53,11 @@ CamGst::~CamGst() {
         mBuffer = NULL;
         mBufferSize = 0; 
     }
+    if(mSample != NULL) {
+        gst_sample_unref(mSample);
+        mSample = NULL;
+    }
+
     deletePipeline();
     g_main_loop_quit(mLoop);
     g_main_loop_unref(mLoop);
@@ -65,7 +71,7 @@ CamGst::~CamGst() {
 void CamGst::printElementFactories() {
 
     g_print("ELEMENT FACTORIES BEGIN ###################################################################\n");
-    GList* elements = gst_registry_get_feature_list (gst_registry_get_default(), GST_TYPE_ELEMENT_FACTORY);
+    GList* elements = gst_registry_get_feature_list (gst_registry_get(), GST_TYPE_ELEMENT_FACTORY);
     for(;elements != NULL; elements = elements->next)
     {
         GstElementFactory* factory = GST_ELEMENT_FACTORY(elements->data);
@@ -95,8 +101,7 @@ void CamGst::createDefaultPipeline(bool check_for_valid_params,
     GstElement* source = createDefaultSource(mDevice);
     GstElement* colorspace  = gst_element_factory_make("ffmpegcolorspace", "colorspace");
     if(colorspace == NULL) {
-        deletePipeline();
-        throw CamGstException("Colorspace convertion element could not be created");
+        LOG_WARN_S << "Colorspace convertion element could not be created. Will continue without." << std::endl;
     }
     
     GstElement* sink = createDefaultSink();
@@ -225,7 +230,8 @@ void CamGst::stopPipeline() {
     }
 
     // Setting to GST_STATE_NULL does not happen asynchronously, wait until stop.
-    gst_element_set_state(mPipeline, GST_STATE_NULL);
+    GstStateChangeReturn st = gst_element_set_state(mPipeline, GST_STATE_NULL);
+
     mPipelineRunning = false;
 
     rmFileDescriptor();
@@ -253,7 +259,17 @@ bool CamGst::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read,
         } else {
             // Copy buffer for return.
             buffer.resize(mBufferSize);
-            memcpy(&buffer[0], GST_BUFFER_DATA(mBuffer), mBufferSize);
+            GstMapInfo info;
+            GstMapFlags flags = GST_MAP_READ;
+            GstBuffer* b = gst_sample_get_buffer(mSample);
+            gboolean st = gst_buffer_map(b, &info, flags);
+            if(!st){
+                LOG_ERROR_S << "Error while copying frame buffer";
+                pthread_mutex_unlock(&mMutexBuffer);
+                return false;
+            }
+            memcpy(&buffer[0], info.data, mBufferSize);
+            gst_buffer_unmap(mBuffer, &info);
             mNewBuffer = false;
             pthread_mutex_unlock(&mMutexBuffer);
             blocking_read = false; // Done, return true.
@@ -378,7 +394,7 @@ GstElement* CamGst::createDefaultCap(uint32_t const width, uint32_t const height
     if (!fourcc.empty())
     {
         gst_caps_set_simple(caps,
-                "format", GST_TYPE_FOURCC, GST_STR_FOURCC (fourcc.c_str()),
+                "format", G_TYPE_INT, GST_STR_FOURCC (fourcc.c_str()),
                 (void*)NULL);
     }
 
@@ -415,10 +431,10 @@ GstElement* CamGst::createDefaultSink() {
             //"max_buffers", 8,
             //"drop", FALSE,
             (void*)NULL);
-	gst_app_sink_set_emit_signals ((GstAppSink*) element, TRUE);
+    g_object_set (element, "emit-signals", TRUE, NULL);
 
     // do after add und link? Disconnecting?
-	g_signal_connect (element, "new-buffer",  G_CALLBACK (callbackNewBufferStatic), this);
+    g_signal_connect (element, "new-sample",  G_CALLBACK (callbackNewBufferStatic), this);
     return element;
 }
 
@@ -484,11 +500,11 @@ gboolean CamGst::callbackMessages(GstBus* bus, GstMessage* msg, gpointer data)
     return true;
 }
 
-void CamGst::callbackNewBufferStatic(GstElement* object, CamGst* cam_gst_p) {
+void CamGst::callbackNewBufferStatic(GstAppSink* object, CamGst* cam_gst_p) {
     cam_gst_p->callbackNewBuffer(object, cam_gst_p);
 }   
 
-void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
+void CamGst::callbackNewBuffer(GstAppSink* object, CamGst* cam_gst_p) {
     LOG_DEBUG("CamGst: callbackNewBuffer");
     pthread_mutex_lock(&mMutexBuffer);
     if(mBuffer != NULL) {
@@ -497,14 +513,16 @@ void CamGst::callbackNewBuffer(GstElement* object, CamGst* cam_gst_p) {
         mBuffer = NULL;
         mBufferSize = 0; 
     }
-    mBuffer = gst_app_sink_pull_buffer((GstAppSink*)object);
+
+    mSample = gst_app_sink_pull_sample(object);
+    mBuffer = gst_sample_get_buffer(mSample);
 
     if(mBuffer == NULL) { // EOS was received before any buffer
         mBufferSize = 0;
         mNewBuffer = false;
         LOG_WARN("EOS was received before any buffer");
     } else {
-        mBufferSize = GST_BUFFER_SIZE(mBuffer);
+        mBufferSize = gst_buffer_get_size(mBuffer);
         mNewBuffer = true;
         LOG_DEBUG("New image received, size: %d",mBufferSize); 
     }
