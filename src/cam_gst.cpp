@@ -261,8 +261,8 @@ bool CamGst::getBuffer(std::vector<uint8_t>& buffer, bool blocking_read,
             buffer.resize(mBufferSize);
             GstMapInfo info;
             GstMapFlags flags = GST_MAP_READ;
-            GstBuffer* b = gst_sample_get_buffer(mSample);
-            gboolean st = gst_buffer_map(b, &info, flags);
+            assert(mSample);
+            gboolean st = gst_buffer_map(mBuffer, &info, flags);
             if(!st){
                 LOG_ERROR_S << "Error while copying frame buffer";
                 pthread_mutex_unlock(&mMutexBuffer);
@@ -507,15 +507,25 @@ void CamGst::callbackNewBufferStatic(GstAppSink* object, CamGst* cam_gst_p) {
 void CamGst::callbackNewBuffer(GstAppSink* object, CamGst* cam_gst_p) {
     LOG_DEBUG("CamGst: callbackNewBuffer");
     pthread_mutex_lock(&mMutexBuffer);
+    //clean up old buffer and sample
     if(mBuffer != NULL) {
         LOG_DEBUG("Unref old image buffer");
         gst_buffer_unref(mBuffer);
         mBuffer = NULL;
         mBufferSize = 0; 
     }
+    if(mSample != NULL) {
+        gst_sample_unref(mSample);
+        mSample = NULL;
+    }
 
+    //Pull new sample and store buffer
     mSample = gst_app_sink_pull_sample(object);
-    mBuffer = gst_sample_get_buffer(mSample);
+    if(mSample == NULL){
+        LOG_ERROR_S << "Could not pull sample";
+        return;
+    }
+    mBuffer = gst_buffer_ref(gst_sample_get_buffer(mSample));
 
     if(mBuffer == NULL) { // EOS was received before any buffer
         mBufferSize = 0;
