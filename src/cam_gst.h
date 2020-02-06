@@ -208,12 +208,12 @@ class CamGst {
     /**
      * Calls the method 'callbackNewBuffer()' of the passed CamGst object.
      */
-    static void callbackNewBufferStatic(GstElement* object, CamGst* cam_gst_p); 
+    static void callbackNewBufferStatic(GstAppSink *object, CamGst* cam_gst_p);
     
     /**
      * Copies the received image to 'mBuffer'.
      */
-    void callbackNewBuffer(GstElement* object, CamGst* cam_gst_p); 
+    void callbackNewBuffer(GstAppSink* object, CamGst* cam_gst_p);
 
     /**
      * Print element factories for debugging purposes
@@ -232,6 +232,7 @@ class CamGst {
     pthread_mutex_t mMutexBuffer;
     GstBuffer* mBuffer;
     uint32_t mBufferSize;
+    GstSample* mSample;
     bool mNewBuffer;
 
     GstElement* mSource; // Used to request the fd.
